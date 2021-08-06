@@ -1,4 +1,3 @@
-// -*- Mode: c -*-
 #include <core.p4>
 #include <xsa.p4>
 
@@ -306,6 +305,10 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
 	// Calculate UDP pseudo header checksum delta using rfc1624 method
 
+	cksum_swap(ckd, hdr.ipv6.dstAddr[127:112], ip_dst[127:112]);
+	cksum_swap(ckd, hdr.ipv6.dstAddr[111:96],  ip_dst[111:96]);
+	cksum_swap(ckd, hdr.ipv6.dstAddr[95:80], ip_dst[95:80]);
+	cksum_swap(ckd, hdr.ipv6.dstAddr[79:64], ip_dst[79:64]);
 	cksum_swap(ckd, hdr.ipv6.dstAddr[63:48], ip_dst[63:48]);
 	cksum_swap(ckd, hdr.ipv6.dstAddr[47:32], ip_dst[47:32]);
 	cksum_swap(ckd, hdr.ipv6.dstAddr[31:16], ip_dst[31:16]);
