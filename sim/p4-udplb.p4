@@ -61,11 +61,13 @@ header udplb_t {
 
 struct short_metadata {
     bit<64> ingress_global_timestamp;
-    bit<9>  egress_spec;
-    bit<1>  processed;
+    bit<2>  dest_port;
+    bit<1>  truncate_enable;
     bit<16> packet_length;
+    bit<1>  rss_override_enable;
+    bit<8>  rss_override;
 }
-  
+
 struct headers {
     ethernet_t       ethernet;
     ipv4_t           ipv4;
