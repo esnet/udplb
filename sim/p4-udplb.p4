@@ -84,42 +84,6 @@ error {
     InvalidUDPLBversion
 }
 
-#if 0
-#if 0
-// Fix up IPv4 header checksum using rfc1624 method
-//
-//  HC  - old checksum in header
-//  C   - one's complement sum of old header
-//  HC' - new checksum in header
-//  C'  - one's complement sum of new header
-//  m   - old value of a 16-bit field
-//  m'  - new value of a 16-bit field
-//
-// HC' = ~(C + (-m) + m')    --    [Eqn. 3]
-//     = ~(~HC + ~m + m')
-    
-bit<16> cksum_swap(in bit<16> hc, in bit<16> old, in bit<16> new) {
-    bit<18> sum;
-
-    sum = (bit<18>)(hc ^ (bit<16>)0xFFFF);
-    sum = sum + (bit<18>)(old ^ (bit<16>)0xFFFF);
-    sum = sum + (bit<18>)(new);
-
-    // Wrap any carry bits back around into the lsbs
-    sum = (sum & 0xFFFF) + (sum >> 16);
-    sum = (sum & 0xFFFF) + (sum >> 16);
-
-    return sum[15:0];
-}
-
-#else
-
-bit<16> cksum_swap(in bit<16> hc, in bit<16> old, in bit<16> new) {
-    return hc ^ 0xFFFF;
-}
-#endif
-#endif
-
 parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
     state start {
         transition parse_ethernet;
@@ -188,7 +152,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.ethernet.etherType : exact;
 	    meta_ipdst : exact;
 	}
-	size = 32;
+	size = 64;
 	default_action = drop;
     }
 
@@ -245,24 +209,26 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 
     // Cumulative checksum delta due to field rewrites
     bit<16> ckd = 0;
-    bit<16> new_udp_dst = 0;
+
+    bit<48>  new_mac_dst = 0x0;
+    bit<32>  new_ip4_dst = 0x0;
+    bit<128> new_ip6_dst = 0x0;
+    bit<16>  new_udp_dst = 0x0;
 
     action cksum_sub(inout bit<16> cksum, in bit<16> a) {
-	bit<17> sum = (bit<17>) cksum;
+	bit<18> sum = 2w00 ++ cksum;
+	bit<18> a_x = 2w00 ++ (a ^ 0xFFFF); 
 
-	sum = sum + (bit<17>)(a ^ 0xFFFF);
-	sum = (sum & 0xFFFF) + (sum >> 16);
-
-	cksum = sum[15:0];
+	sum = sum + a_x;
+	cksum = sum[15:0] + (15w00 ++ sum[16:16]);
     }
 
     action cksum_add(inout bit<16> cksum, in bit<16> a) {
-	bit<17> sum = (bit<17>) cksum;
-
-	sum = sum + (bit<17>)a;
-	sum = (sum & 0xFFFF) + (sum >> 16);
-
-	cksum = sum[15:0];
+	bit<18> sum = 2w00 ++ cksum;
+	bit<18> a_x = 2w00 ++ a;
+	
+	sum = sum + a_x;
+	cksum = sum[15:0] + (15w00 ++ sum[16:16]);
     }
 
     action cksum_swap(inout bit<16> cksum, in bit<16> old, in bit<16> new) {
@@ -270,22 +236,14 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	cksum_add(cksum, new);
     }
 
- #if 0
-    action cksum_swap(inout bit<16> cksum, in bit<16> old, in bit<16> new) {
-	bit<17> sum = (bit<17>) cksum;
-
-	// Wrap any carry bits back around into the lsbs
-	//sum = (bit<17>)(sum ^ 0xFFFF);
-	sum = sum + (bit<17>)(old ^ 0xFFFF);
-	sum = (sum & 0xFFFF) + (sum >> 16);
-	sum = sum + (bit<17>)(new);
-	sum = (sum & 0xFFFF) + (sum >> 16);
-
-	cksum = sum[15:0];
-    }
-#endif
-    
     action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
+	new_mac_dst = mac_dst;
+	new_ip4_dst  = ip_dst;
+	new_udp_dst = udp_dst;
+    }
+
+
+    action run_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
 	// Calculate IPv4 and UDP pseudo header checksum delta using rfc1624 method
 
 	cksum_swap(ckd, hdr.ipv4.dstAddr[31:16], ip_dst[31:16]);
@@ -304,7 +262,15 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	new_udp_dst = udp_dst;
     }
 
+
     action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
+	new_mac_dst = mac_dst;
+	new_ip6_dst = ip_dst;
+	new_udp_dst = udp_dst;
+    }
+
+
+    action run_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
 	// Calculate UDP pseudo header checksum delta using rfc1624 method
 
 	cksum_swap(ckd, hdr.ipv6.dstAddr[127:112], ip_dst[127:112]);
@@ -323,6 +289,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - 12;
 	new_udp_dst = udp_dst;
     }
+
 
     table member_info_lookup_table {
 	actions = {
@@ -387,7 +354,14 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	hit = member_info_lookup_table.apply().hit;
 	if (!hit) {
 	    return;
-	}
+	} else {
+	  if (hdr.ipv4.isValid()) {
+            run_ipv4_member_rewrite(new_mac_dst,new_ip4_dst,new_udp_dst);
+	  }
+	  if (hdr.ipv6.isValid()) {
+	    run_ipv6_member_rewrite(new_mac_dst,new_ip6_dst,new_udp_dst);
+	  }
+        }
 
 	//
 	// UpdateUDPChecksum
@@ -424,6 +398,7 @@ control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata sho
         packet.emit(hdr.ipv4_opt);
         packet.emit(hdr.ipv6);
         packet.emit(hdr.udp);
+//	packet.emit(hdr.udplb);
     }
 }
 
