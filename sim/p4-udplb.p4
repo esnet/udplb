@@ -132,8 +132,8 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     // DstFilter
     //
 
-    bit<128> meta_ipdst = 128w0;
-	
+    bit<128> meta_ipdst = 0;
+
     action drop() {
 	smeta.drop = 1;
     }
