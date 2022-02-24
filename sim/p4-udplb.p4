@@ -179,7 +179,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     //
 
     // Use lsbs of tick to select a calendar slot
-    bit<9> calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
+    bit<9> calendar_slot = 0;
     bit<16> meta_member_id = 0;
 
     action do_assign_member(bit<16> member_id) {
@@ -365,6 +365,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	// LoadBalanceCalendar
 	//
 
+	calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {
 	    return;
