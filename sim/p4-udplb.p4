@@ -94,7 +94,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
             16w0x86dd: parse_ipv6;
-            default: accept;
         }
     }
     state parse_ipv4 {
@@ -103,7 +102,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ipv4_opt, (((bit<32>)hdr.ipv4.ihl - 5) * 32));
         transition select(hdr.ipv4.protocol) {
             8w17: parse_udp;
-            default: accept;
         }
     }
     state parse_ipv6 {
@@ -111,14 +109,12 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
             8w17: parse_udp;
-            default: accept;
         }
     }
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
 	  16w0x4c42: parse_udplb;
-	  default: accept;
 	}
     }
 
@@ -309,10 +305,16 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     apply {
 	bool hit;
 
+	// Drop all packets that failed the parse stage
+	if (smeta.parser_error != error.NoError) {
+	    drop();
+	    return;
+	}
+
 	//
 	// DstFilter
 	//
-	
+
 	// Normalize the IP destination address
 	if (hdr.ipv4.isValid()) {
 	    meta_ipdst = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
@@ -353,10 +355,6 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	//
 	// EpochAssign
 	//
-
-	if (!hdr.udplb.isValid()) {
-	    return;
-	}
 
 	hit = epoch_assign_table.apply().hit;
 	if (!hit) {
