@@ -94,7 +94,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
             16w0x86dd: parse_ipv6;
-            default: accept;
         }
     }
     state parse_ipv4 {
@@ -103,7 +102,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ipv4_opt, (((bit<32>)hdr.ipv4.ihl - 5) * 32));
         transition select(hdr.ipv4.protocol) {
             8w17: parse_udp;
-            default: accept;
         }
     }
     state parse_ipv6 {
@@ -111,14 +109,12 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
             8w17: parse_udp;
-            default: accept;
         }
     }
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
 	  16w0x4c42: parse_udplb;
-	  default: accept;
 	}
     }
 
@@ -136,8 +132,8 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     // DstFilter
     //
 
-    bit<128> meta_ipdst = 128w0;
-	
+    bit<128> meta_ipdst = 0;
+
     action drop() {
 	smeta.drop = 1;
     }
@@ -183,7 +179,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     //
 
     // Use lsbs of tick to select a calendar slot
-    bit<9> calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
+    bit<9> calendar_slot = 0;
     bit<16> meta_member_id = 0;
 
     action do_assign_member(bit<16> member_id) {
@@ -309,10 +305,16 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     apply {
 	bool hit;
 
+	// Drop all packets that failed the parse stage
+	if (smeta.parser_error != error.NoError) {
+	    drop();
+	    return;
+	}
+
 	//
 	// DstFilter
 	//
-	
+
 	// Normalize the IP destination address
 	if (hdr.ipv4.isValid()) {
 	    meta_ipdst = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
@@ -354,10 +356,6 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	// EpochAssign
 	//
 
-	if (!hdr.udplb.isValid()) {
-	    return;
-	}
-
 	hit = epoch_assign_table.apply().hit;
 	if (!hit) {
 	    return;
@@ -367,6 +365,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	// LoadBalanceCalendar
 	//
 
+	calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {
 	    return;
