@@ -34,6 +34,11 @@ with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
     p = Ether(dst=ETHER_BROADCAST, src="00:ab:cd:ef:01:02") / ARP(op=1, psrc="10.1.2.2", pdst="10.1.2.3")
     w._write_packet(p)
 
+    p = Ether(dst="33:33:ff:cc:dd:ee", src="00:11:22:33:44:55") / IPv6(dst="ff02::1:ffcc:ddee", src="fe80::1")/ICMPv6ND_NS(tgt="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee") / ICMPv6NDOptSrcLLAddr(lladdr='00:11:22:33:44:55')
+    w._write_packet(p)
+    p = Ether(dst="33:33:ff:cc:dd:ee", src="00:11:22:33:44:55") / IPv6(dst="ff02::1:ffcc:ddee", src="::")/ICMPv6ND_NS(tgt="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee")
+    w._write_packet(p)
+
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:

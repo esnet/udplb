@@ -37,6 +37,34 @@ header ipv6_t {
     bit<128> dstAddr;
 }
 
+header icmpv6_common_t {
+    bit<8>   msg_type;
+    bit<8>   code;
+    bit<16>  checksum;
+}
+
+header ipv6nd_neigh_sol_t {
+    bit<32>  rsvd;
+    bit<128> target;
+}
+
+header ipv6nd_option_common_t {
+    bit<8>   option_type;
+    bit<8>   length;
+}
+
+header ipv6nd_option_lladdr_t {
+    bit<48>  ethernet_addr;
+}
+
+header ipv6nd_neigh_adv_t {
+    bit<1>   router_flag;
+    bit<1>   solicited_flag;
+    bit<1>   override_flag;
+    bit<29>  rsvd;
+    bit<128> target;
+}
+
 header ipv4_t {
     bit<4>  version;
     bit<4>  ihl;
@@ -86,6 +114,11 @@ struct headers {
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
     ipv6_t                  ipv6;
+    icmpv6_common_t         icmpv6_common;
+    ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
+    ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
+    ipv6nd_option_common_t  ipv6nd_option_common;
+    ipv6nd_option_lladdr_t  ipv6nd_option_lladdr;
     udp_t                   udp;
     udplb_t                 udplb;
 }
@@ -134,13 +167,44 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
             8w17: parse_udp;
         }
     }
+
     state parse_ipv6 {
         packet.extract(hdr.ipv6);
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
+	    8w58: parse_icmpv6;
             8w17: parse_udp;
         }
     }
+
+    state parse_icmpv6 {
+	packet.extract(hdr.icmpv6_common);
+	transition select(hdr.icmpv6_common.msg_type) {
+	    8w135: parse_ipv6nd_neigh_sol;
+	}
+    }
+
+    state parse_ipv6nd_neigh_sol {
+	packet.extract(hdr.ipv6nd_neigh_sol);
+	transition select(hdr.ipv6.payloadLen) {
+	    16w24: accept;                        // No options
+	    default: parse_ipv6nd_option;         // Has at least one option
+	}
+    }
+
+    state parse_ipv6nd_option {
+	packet.extract(hdr.ipv6nd_option_common);
+	transition select(hdr.ipv6nd_option_common.option_type) {
+	    8w1: parse_ipv6nd_option_lladdr;
+	    default: accept;
+	}
+    }
+
+    state parse_ipv6nd_option_lladdr {
+	packet.extract(hdr.ipv6nd_option_lladdr);
+	transition accept;
+    }
+
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
@@ -415,6 +479,116 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
 	    return;
+	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
+	    bit<128> new_ip_da;
+	    bit<48>  new_mac_da;
+
+	    // Make sure this is an ND solicitation for our unicast IPv6 address
+	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
+		drop();
+		return;
+	    }
+
+	    // Figure out what our destination addresses should be based on the type of query we've received
+	    if (hdr.ipv6.srcAddr == 128w0) {
+		// Source is the unspecified address so reply to the all-nodes multicast IP
+		new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
+		new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
+	    } else {
+		// Reply to the originating source IP
+		new_ip_da = hdr.ipv6.srcAddr;
+
+		if (hdr.ipv6nd_option_lladdr.isValid()) {
+		    // The request includes a link-layer address for the originator, reply to that
+		    new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
+		} else {
+		    // No link-layer address option, reply to the unicast MAC from the original frame
+		    new_mac_da = hdr.ethernet.srcAddr;
+		}
+	    }
+
+	    // Update our ethernet header addresses
+	    hdr.ethernet.dstAddr = new_mac_da;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Update our ipv6 header addresses
+	    hdr.ipv6.dstAddr = new_ip_da;
+	    hdr.ipv6.srcAddr = meta_ip_sa;
+
+	    // Reset our hop limit
+	    hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
+
+	    // Set our new payload length
+	    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
+
+	    // Fill out the ICMPv6 common header
+	    hdr.icmpv6_common.setValid();
+	    hdr.icmpv6_common.msg_type = 136;   // ND Advertisement
+	    hdr.icmpv6_common.code     = 0;
+	    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
+
+	    // Fill out our ND advertisement
+	    hdr.ipv6nd_neigh_adv.setValid();
+	    hdr.ipv6nd_neigh_adv.router_flag    = 0;
+	    hdr.ipv6nd_neigh_adv.solicited_flag = 1;
+	    hdr.ipv6nd_neigh_adv.override_flag  = 0;
+	    hdr.ipv6nd_neigh_adv.rsvd           = 0;
+	    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
+
+	    // Fill out the ND advertisement option common header
+	    hdr.ipv6nd_option_common.setValid();
+	    hdr.ipv6nd_option_common.option_type   = 2;   // Target Link-Layer Address
+	    hdr.ipv6nd_option_common.length        = 1;
+
+	    // Fill out the ND advertisement lladdr common header
+	    hdr.ipv6nd_option_lladdr.setValid();
+	    hdr.ipv6nd_option_lladdr.ethernet_addr = meta_mac_sa;
+
+	    // Calculate the checksum over the pseudo header + payload
+	    cksum_add(ckd, hdr.ipv6.srcAddr[127:112]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[111:96]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[95:80]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[79:64]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[63:48]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[47:32]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[31:16]);
+	    cksum_add(ckd, hdr.ipv6.srcAddr[15:00]);
+
+	    cksum_add(ckd, hdr.ipv6.dstAddr[127:112]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[111:96]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[95:80]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[79:64]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[63:48]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[47:32]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[31:16]);
+	    cksum_add(ckd, hdr.ipv6.dstAddr[15:00]);
+
+	    cksum_add(ckd, hdr.ipv6.payloadLen);
+	    cksum_add(ckd, 8w0 ++ hdr.ipv6.nextHdr);
+
+	    cksum_add(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.router_flag ++ hdr.ipv6nd_neigh_adv.solicited_flag ++ hdr.ipv6nd_neigh_adv.override_flag ++ hdr.ipv6nd_neigh_adv.rsvd[28:16]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[127:112]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[111:96]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[95:80]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[79:64]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[63:48]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[47:32]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[31:16]);
+	    cksum_add(ckd, hdr.ipv6nd_neigh_adv.target[15:00]);
+
+	    cksum_add(ckd, hdr.ipv6nd_option_common.option_type ++ hdr.ipv6nd_option_common.length);
+
+	    cksum_add(ckd, hdr.ipv6nd_option_lladdr.ethernet_addr[47:32]);
+	    cksum_add(ckd, hdr.ipv6nd_option_lladdr.ethernet_addr[31:16]);
+	    cksum_add(ckd, hdr.ipv6nd_option_lladdr.ethernet_addr[15:00]);
+
+	    // Write the final checksum to the packet
+	    hdr.icmpv6_common.checksum = hdr.icmpv6_common.checksum ^ 0xFFFF;
+	    cksum_add(hdr.icmpv6_common.checksum, ckd);
+	    hdr.icmpv6_common.checksum = hdr.icmpv6_common.checksum ^ 0xFFFF;
+	    return;
 	}
 
 	// Any packets that make it past here should be from our assigned unicast MAC addresses
@@ -508,8 +682,11 @@ control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata sho
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
         packet.emit(hdr.ipv6);
+	packet.emit(hdr.icmpv6_common);
+	packet.emit(hdr.ipv6nd_neigh_adv);
+	packet.emit(hdr.ipv6nd_option_common);
+	packet.emit(hdr.ipv6nd_option_lladdr);
         packet.emit(hdr.udp);
-//	packet.emit(hdr.udplb);
     }
 }
 
