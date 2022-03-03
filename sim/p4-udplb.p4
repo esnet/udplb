@@ -742,25 +742,17 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 #endif // INCLUDE_IPV6ND
 	}
 
-	// Any packets that make it past here should be from our assigned unicast MAC addresses
+	// All packets must be originated with our assigned unicast MAC address
 	hdr.ethernet.srcAddr = meta_mac_sa;
 
-	// Technically, we just want to rewrite the IP Src to be the load-balancer IP but that would require header
-	// checksum fixups.  Instead, we'll *Swap* the IP Dst and IP Src so that we are neutral on the IP/UDP checksums,
-	// knowing that the rest of the pipeline will eventually overwrite the (now bogus IP Dst) and fix up all checksums
-	// before sending the packet out.
+	// All packets must be originated with our assigned unicast IP address
+	// Keep track of how our edit has affected the IP/pseudo-header checksums
 	if (hdr.ipv4.isValid()) {
-	    // Swap the IPv4 addresses using an intermediate temp var
-	    bit<32> tmpAddr;
-	    tmpAddr = hdr.ipv4.srcAddr;
-	    hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
-	    hdr.ipv4.dstAddr = tmpAddr;
+	    cksum_swap_bit32(ckd, hdr.ipv4.srcAddr, meta_ip_sa[31:0]);
+	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
 	} else if (hdr.ipv6.isValid()) {
-	    // Swap the IPv6 addresses using an intermediate temp var
-	    bit<128> tmpAddr;
-	    tmpAddr = hdr.ipv6.srcAddr;
-	    hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
-	    hdr.ipv6.dstAddr = tmpAddr;
+	    cksum_swap_bit128(ckd, hdr.ipv6.srcAddr, meta_ip_sa);
+	    hdr.ipv6.srcAddr = meta_ip_sa;
 	}
 
 	//
