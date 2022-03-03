@@ -644,9 +644,8 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.arp.tha = hdr.arp.sha;
 	    hdr.arp.sha = meta_mac_sa;
 	    // Swap sender/target IP addresses
-	    bit<32> tmp_ip = hdr.arp.tpa;
 	    hdr.arp.tpa = hdr.arp.spa;
-	    hdr.arp.spa = tmp_ip;
+	    hdr.arp.spa = meta_ip_sa[31:0];
 
 	    // Send the ethernet frame back to the originator
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
