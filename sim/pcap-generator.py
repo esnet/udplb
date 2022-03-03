@@ -30,6 +30,10 @@ EVIO6_SEG_SIZE = 100
 
 with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
     w._write_header([])
+
+    p = Ether(dst=ETHER_BROADCAST, src="00:ab:cd:ef:01:02") / ARP(op=1, psrc="10.1.2.2", pdst="10.1.2.3")
+    w._write_packet(p)
+
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -43,6 +47,6 @@ with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
         w._write_packet(p)
         #print(p.show())
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fe80::2", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w._write_packet(p)
         #print(p.show())

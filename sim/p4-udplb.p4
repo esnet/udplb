@@ -14,6 +14,18 @@ header ethernet_t {
     bit<16> etherType;
 }
 
+header arp_t {
+    bit<16>  htype;
+    bit<16>  ptype;
+    bit<8>   hlen;
+    bit<8>   plen;
+    bit<16>  oper;
+    bit<48>  sha;
+    bit<32>  spa;
+    bit<48>  tha;
+    bit<32>  tpa;
+}
+
 header ipv6_t {
     bit<4>   version;
     bit<8>   trafficClass;
@@ -69,16 +81,22 @@ struct short_metadata {
 }
 
 struct headers {
-    ethernet_t       ethernet;
-    ipv4_t           ipv4;
-    ipv4_opt_t       ipv4_opt;
-    ipv6_t           ipv6;
-    udp_t            udp;
-    udplb_t          udplb;
+    ethernet_t              ethernet;
+    arp_t                   arp;
+    ipv4_t                  ipv4;
+    ipv4_opt_t              ipv4_opt;
+    ipv6_t                  ipv6;
+    udp_t                   udp;
+    udplb_t                 udplb;
 }
 
 // User-defined errors 
 error {
+    UnhandledArpHType,
+    UnhandledArpPType,
+    UnhandledArpHLen,
+    UnhandledArpPLen,
+    UnhandledArpOper,
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
@@ -93,9 +111,21 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
+	    16w0x0806: parse_arp;
             16w0x86dd: parse_ipv6;
         }
     }
+
+    state parse_arp {
+	packet.extract(hdr.arp);
+	verify(hdr.arp.htype == 1, error.UnhandledArpHType);       // Ethernet
+	verify(hdr.arp.ptype == 0x0800, error.UnhandledArpPType);  // IPv4
+	verify(hdr.arp.hlen == 6, error.UnhandledArpHLen);         // MAC addr length (6)
+	verify(hdr.arp.plen == 4, error.UnhandledArpPLen);         // IPv4 addr length (4)
+	verify(hdr.arp.oper == 1, error.UnhandledArpOper);         // Request
+	transition accept;
+    }
+
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
 	verify(hdr.ipv4.version == 4 && hdr.ipv4.ihl >= 5, error.InvalidIPpacket);
@@ -129,24 +159,49 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
 
     //
-    // DstFilter
+    // MacDstFilter
     //
 
-    bit<128> meta_ipdst = 0;
+    bit<128> meta_ip_da = 0;
+    bit<48>  meta_mac_sa = 0;
+    bit<128> meta_ip_sa = 0;
 
     action drop() {
 	smeta.drop = 1;
     }
-    
-    table dst_filter_table {
+
+    action set_mac_sa(bit<48> mac_sa) {
+	meta_mac_sa = mac_sa;
+    }
+
+    table mac_dst_filter_table {
 	actions = {
 	    drop;
-	    NoAction;
+	    set_mac_sa;
 	}
 	key = {
 	    hdr.ethernet.dstAddr : exact;
+	}
+	size = 64;
+	default_action = drop;
+    }
+
+    //
+    // IPDstFilter
+    //
+
+    action set_ip_sa(bit<128> ip_sa) {
+	meta_ip_sa = ip_sa;
+    }
+
+    table ip_dst_filter_table {
+	actions = {
+	    drop;
+	    set_ip_sa;
+	}
+	key = {
 	    hdr.ethernet.etherType : exact;
-	    meta_ipdst : exact;
+	    meta_ip_da : exact;
 	}
 	size = 64;
 	default_action = drop;
@@ -312,27 +367,58 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	}
 
 	//
-	// DstFilter
+	// MacDstFilter
 	//
 
-	// Normalize the IP destination address
-	if (hdr.ipv4.isValid()) {
-	    meta_ipdst = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
-	} else if (hdr.ipv6.isValid()) {
-	    meta_ipdst = hdr.ipv6.dstAddr;
-	}
-	
-	hit = dst_filter_table.apply().hit;
+	hit = mac_dst_filter_table.apply().hit;
 	if (!hit) {
 	    return;
 	}
 
-	// Packet has been validated as being *to* our MAC DA and IP Dst
-	// We'll assume that the control plane is announcing ARP mappings that match the entries in the DstFilter table.
-	// Given that, any packet that we allow in should always be sent back out from the same consistent identity
-	// (MAC SA + IP Src).
-	// Copy the permitted MAC DA -> MAC SA.  This doesn't affect any checksums
-	hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+	//
+	// IPDstFilter
+	//
+
+	// Normalize the IP destination address
+	if (hdr.ipv4.isValid()) {
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
+	} else if (hdr.ipv6.isValid()) {
+	    meta_ip_da = hdr.ipv6.dstAddr;
+	} else if (hdr.arp.isValid()) {
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
+	}
+
+	hit = ip_dst_filter_table.apply().hit;
+	if (!hit) {
+	    return;
+	}
+
+	// Handle ARP/ND requests
+	if (hdr.arp.isValid()) {
+	    // Make sure this is an ARP specifically for our unicast IPv4 address
+	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
+		drop();
+		return;
+	    }
+
+	    // Convert the request into a reply
+	    hdr.arp.oper = 2;
+	    // Swap sender/target HW address and fill in our unicast MAC as the sha
+	    hdr.arp.tha = hdr.arp.sha;
+	    hdr.arp.sha = meta_mac_sa;
+	    // Swap sender/target IP addresses
+	    bit<32> tmp_ip = hdr.arp.tpa;
+	    hdr.arp.tpa = hdr.arp.spa;
+	    hdr.arp.spa = tmp_ip;
+
+	    // Send the ethernet frame back to the originator
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+	    return;
+	}
+
+	// Any packets that make it past here should be from our assigned unicast MAC addresses
+	hdr.ethernet.srcAddr = meta_mac_sa;
 
 	// Technically, we just want to rewrite the IP Src to be the load-balancer IP but that would require header
 	// checksum fixups.  Instead, we'll *Swap* the IP Dst and IP Src so that we are neutral on the IP/UDP checksums,
@@ -418,6 +504,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
+	packet.emit(hdr.arp);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
         packet.emit(hdr.ipv6);
