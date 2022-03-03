@@ -1,6 +1,7 @@
 #include <core.p4>
 #include <xsa.p4>
 
+#define INCLUDE_IPV6ND 1
 struct intrinsic_metadata_t {
     bit<64> ingress_global_timestamp;
     bit<64> egress_global_timestamp;
@@ -37,6 +38,8 @@ header ipv6_t {
     bit<128> dstAddr;
 }
 
+#if INCLUDE_IPV6ND
+
 header icmpv6_common_t {
     bit<8>   msg_type;
     bit<8>   code;
@@ -64,6 +67,7 @@ header ipv6nd_neigh_adv_t {
     bit<29>  rsvd;
     bit<128> target;
 }
+#endif // INCLUDE_IPV6ND
 
 header ipv4_t {
     bit<4>  version;
@@ -114,11 +118,13 @@ struct headers {
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
     ipv6_t                  ipv6;
+#if INCLUDE_IPV6ND
     icmpv6_common_t         icmpv6_common;
     ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
     ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
     ipv6nd_option_common_t  ipv6nd_option_common;
     ipv6nd_option_lladdr_t  ipv6nd_option_lladdr;
+#endif // INCLUDE_IPV6ND
     udp_t                   udp;
     udplb_t                 udplb;
 }
@@ -172,11 +178,14 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ipv6);
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
+#if INCLUDE_IPV6ND
 	    8w58: parse_icmpv6;
+#endif // INCLUDE_IPV6ND
             8w17: parse_udp;
         }
     }
 
+#if INCLUDE_IPV6ND
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
 	transition select(hdr.icmpv6_common.msg_type) {
@@ -204,6 +213,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 	packet.extract(hdr.ipv6nd_option_lladdr);
 	transition accept;
     }
+#endif // INCLUDE_IPV6ND
 
     state parse_udp {
         packet.extract(hdr.udp);
@@ -479,6 +489,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
 	    return;
+#if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
 	    bit<48>  new_mac_da;
@@ -589,6 +600,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    cksum_add(hdr.icmpv6_common.checksum, ckd);
 	    hdr.icmpv6_common.checksum = hdr.icmpv6_common.checksum ^ 0xFFFF;
 	    return;
+#endif // INCLUDE_IPV6ND
 	}
 
 	// Any packets that make it past here should be from our assigned unicast MAC addresses
@@ -682,10 +694,12 @@ control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata sho
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
         packet.emit(hdr.ipv6);
+#if INCLUDE_IPV6ND
 	packet.emit(hdr.icmpv6_common);
 	packet.emit(hdr.ipv6nd_neigh_adv);
 	packet.emit(hdr.ipv6nd_option_common);
 	packet.emit(hdr.ipv6nd_option_lladdr);
+#endif // INCLUDE_IPV6ND
         packet.emit(hdr.udp);
     }
 }
