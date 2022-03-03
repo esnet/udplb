@@ -2,6 +2,8 @@
 #include <xsa.p4>
 
 #define INCLUDE_IPV6ND 1
+#define INCLUDE_ARP 1
+
 struct intrinsic_metadata_t {
     bit<64> ingress_global_timestamp;
     bit<64> egress_global_timestamp;
@@ -15,6 +17,8 @@ header ethernet_t {
     bit<16> etherType;
 }
 
+#if INCLUDE_ARP
+
 header arp_t {
     bit<16>  htype;
     bit<16>  ptype;
@@ -26,6 +30,8 @@ header arp_t {
     bit<48>  tha;
     bit<32>  tpa;
 }
+
+#endif // INCLUDE_ARP
 
 header ipv6_t {
     bit<4>   version;
@@ -114,7 +120,9 @@ struct short_metadata {
 
 struct headers {
     ethernet_t              ethernet;
+#if INCLUDE_ARP
     arp_t                   arp;
+#endif // INCLUDE_ARP
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
     ipv6_t                  ipv6;
@@ -131,11 +139,13 @@ struct headers {
 
 // User-defined errors 
 error {
+#if INCLUDE_ARP
     UnhandledArpHType,
     UnhandledArpPType,
     UnhandledArpHLen,
     UnhandledArpPLen,
     UnhandledArpOper,
+#endif // INCLUDE_ARP
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
@@ -150,11 +160,14 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
+#if INCLUDE_ARP
 	    16w0x0806: parse_arp;
+#endif // INCLUDE_ARP
             16w0x86dd: parse_ipv6;
         }
     }
 
+#if INCLUDE_ARP
     state parse_arp {
 	packet.extract(hdr.arp);
 	verify(hdr.arp.htype == 1, error.UnhandledArpHType);       // Ethernet
@@ -164,6 +177,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 	verify(hdr.arp.oper == 1, error.UnhandledArpOper);         // Request
 	transition accept;
     }
+#endif // INCLUDE_ARP
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
@@ -458,8 +472,10 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
 	} else if (hdr.ipv6.isValid()) {
 	    meta_ip_da = hdr.ipv6.dstAddr;
+#if INCLUDE_ARP
 	} else if (hdr.arp.isValid()) {
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
+#endif // INCLUDE_ARP
 	}
 
 	hit = ip_dst_filter_table.apply().hit;
@@ -467,6 +483,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    return;
 	}
 
+#if INCLUDE_ARP
 	// Handle ARP/ND requests
 	if (hdr.arp.isValid()) {
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
@@ -489,6 +506,9 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
 	    return;
+#else  // INCLUDE_ARP
+        if (false) {
+#endif // INCLUDE_ARP
 #if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
@@ -690,7 +710,9 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
+#if INCLUDE_ARP
 	packet.emit(hdr.arp);
+#endif // INCLUDE_ARP
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
         packet.emit(hdr.ipv6);
