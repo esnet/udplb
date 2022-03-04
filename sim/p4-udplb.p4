@@ -8,6 +8,7 @@
 
 #define CKSUM_MODE CKSUM_MODE_USE_MACROS
 
+#define INCLUDE_ICMPV4ECHO 1
 #define INCLUDE_IPV6ND 1
 #define INCLUDE_ARP 1
 
@@ -101,6 +102,19 @@ header ipv4_opt_t {
     varbit<320> options; // IPv4 options - length = (ipv4.hdr_len - 5) * 32
 }
 
+#if INCLUDE_ICMPV4ECHO
+header icmpv4_common_t {
+    bit<8>  msg_type;
+    bit<8>  code;
+    bit<16> checksum;
+}
+
+header icmpv4_echo_t {
+    bit<16>  identifier;
+    bit<16>  sequence;
+}
+#endif  // INCLUDE_ICMPV4ECHO
+
 header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -132,6 +146,10 @@ struct headers {
 #endif // INCLUDE_ARP
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
+#if INCLUDE_ICMPV4ECHO
+    icmpv4_common_t         icmpv4_common;
+    icmpv4_echo_t           icmpv4_echo;
+#endif  // INCLUDE_ICMPV4ECHO
     ipv6_t                  ipv6;
 #if INCLUDE_IPV6ND
     icmpv6_common_t         icmpv6_common;
@@ -153,6 +171,9 @@ error {
     UnhandledArpPLen,
     UnhandledArpOper,
 #endif // INCLUDE_ARP
+#if INCLUDE_ICMPV4ECHO
+    InvalidICMPv4EchoCode,
+#endif  // INCLUDE_ICMPV4ECHO
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
@@ -268,6 +289,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 	verify(hdr.ipv4.version == 4 && hdr.ipv4.ihl >= 5, error.InvalidIPpacket);
         packet.extract(hdr.ipv4_opt, (((bit<32>)hdr.ipv4.ihl - 5) * 32));
         transition select(hdr.ipv4.protocol) {
+	    8w1: parse_icmpv4;
             8w17: parse_udp;
         }
     }
@@ -312,6 +334,21 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 	transition accept;
     }
 #endif // INCLUDE_IPV6ND
+
+#if INCLUDE_ICMPV4ECHO
+    state parse_icmpv4 {
+	packet.extract(hdr.icmpv4_common);
+	transition select(hdr.icmpv4_common.msg_type) {
+	    8w8: parse_icmpv4_echo;
+	}
+    }
+
+    state parse_icmpv4_echo {
+	verify(hdr.icmpv4_common.code == 0, error.InvalidICMPv4EchoCode);
+	packet.extract(hdr.icmpv4_echo);
+	transition accept;
+    }
+#endif  // INCLUDE_ICMPV4ECHO
 
     state parse_udp {
         packet.extract(hdr.udp);
@@ -629,9 +666,10 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    return;
 	}
 
+	if (false) {
 #if INCLUDE_ARP
 	// Handle ARP/ND requests
-	if (hdr.arp.isValid()) {
+	} else if (hdr.arp.isValid()) {
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
 		drop();
@@ -651,9 +689,32 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
 	    return;
-#else  // INCLUDE_ARP
-        if (false) {
 #endif // INCLUDE_ARP
+#if INCLUDE_ICMPV4ECHO
+	} else if (hdr.icmpv4_echo.isValid()) {
+	    // Make sure this is a unicast ping for our unicast IPv4 address
+	    if (hdr.ipv4.dstAddr != meta_ip_sa[31:0]) {
+		drop();
+		return;
+	    }
+
+	    // Update our ethernet header
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Update our ipv4 header addresses
+	    hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
+	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
+
+	    // Change the type to be a reply, fixing up the header checksum
+	    cksum_sub_bit16(ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
+	    hdr.icmpv4_common.msg_type = 0;   // Echo Reply
+	    hdr.icmpv4_common.code = 0;
+	    cksum_add_bit16(ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
+	    cksum_update_header(hdr.icmpv4_common.checksum, ckd);
+
+	    return;
+#endif  // INCLUDE_ICMPV4ECHO
 #if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
@@ -821,6 +882,11 @@ control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata sho
 #endif // INCLUDE_ARP
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
+#if INCLUDE_ICMPV4ECHO
+	packet.emit(hdr.icmpv4_common);
+	packet.emit(hdr.icmpv4_echo);
+#endif  // INCLUDE_ICMPV4ECHO
+
         packet.emit(hdr.ipv6);
 #if INCLUDE_IPV6ND
 	packet.emit(hdr.icmpv6_common);

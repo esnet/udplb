@@ -31,6 +31,9 @@ EVIO6_SEG_SIZE = 100
 with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
     w._write_header([])
 
+    p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/ICMP(type=8, id=33, seq=9) / (b"payload goes here")
+    w._write_packet(p)
+
     p = Ether(dst=ETHER_BROADCAST, src="00:ab:cd:ef:01:02") / ARP(op=1, psrc="10.1.2.2", pdst="10.1.2.3")
     w._write_packet(p)
 
