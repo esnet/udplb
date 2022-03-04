@@ -34,6 +34,9 @@ with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
     p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/ICMP(type=8, id=33, seq=9) / (b"payload goes here")
     w._write_packet(p)
 
+    p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/ICMPv6EchoRequest(data="abcdef")
+    w._write_packet(p)
+
     p = Ether(dst=ETHER_BROADCAST, src="00:ab:cd:ef:01:02") / ARP(op=1, psrc="10.1.2.2", pdst="10.1.2.3")
     w._write_packet(p)
 

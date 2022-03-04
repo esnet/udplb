@@ -9,6 +9,7 @@
 #define CKSUM_MODE CKSUM_MODE_USE_MACROS
 
 #define INCLUDE_ICMPV4ECHO 1
+#define INCLUDE_ICMPV6ECHO 1
 #define INCLUDE_IPV6ND 1
 #define INCLUDE_ARP 1
 
@@ -52,7 +53,7 @@ header ipv6_t {
     bit<128> dstAddr;
 }
 
-#if INCLUDE_IPV6ND
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 
 header icmpv6_common_t {
     bit<8>   msg_type;
@@ -60,6 +61,18 @@ header icmpv6_common_t {
     bit<16>  checksum;
 }
 
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_ICMPV6ECHO
+
+header icmpv6_echo_t {
+    bit<16>  identifier;
+    bit<16>  sequence;
+}
+
+#endif  // INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_IPV6ND
 header ipv6nd_neigh_sol_t {
     bit<32>  rsvd;
     bit<128> target;
@@ -151,8 +164,13 @@ struct headers {
     icmpv4_echo_t           icmpv4_echo;
 #endif  // INCLUDE_ICMPV4ECHO
     ipv6_t                  ipv6;
-#if INCLUDE_IPV6ND
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
     icmpv6_common_t         icmpv6_common;
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+#if INCLUDE_ICMPV6ECHO
+    icmpv6_echo_t           icmpv6_echo;
+#endif  // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
     ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
     ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
     ipv6nd_option_common_t  ipv6nd_option_common;
@@ -174,6 +192,9 @@ error {
 #if INCLUDE_ICMPV4ECHO
     InvalidICMPv4EchoCode,
 #endif  // INCLUDE_ICMPV4ECHO
+#if INCLUDE_ICMPV6ECHO
+    InvalidICMPv6EchoCode,
+#endif  // INCLUDE_ICMPV6ECHO
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
@@ -305,14 +326,25 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         }
     }
 
-#if INCLUDE_IPV6ND
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
 	transition select(hdr.icmpv6_common.msg_type) {
+	    8w128: parse_icmpv6_echo;
 	    8w135: parse_ipv6nd_neigh_sol;
 	}
     }
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 
+#if INCLUDE_ICMPV6ECHO
+    state parse_icmpv6_echo {
+	verify(hdr.icmpv6_common.code == 0, error.InvalidICMPv6EchoCode);
+	packet.extract(hdr.icmpv6_echo);
+	transition accept;
+    }
+#endif  // INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_IPV6ND
     state parse_ipv6nd_neigh_sol {
 	packet.extract(hdr.ipv6nd_neigh_sol);
 	transition select(hdr.ipv6.payloadLen) {
@@ -715,6 +747,35 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 
 	    return;
 #endif  // INCLUDE_ICMPV4ECHO
+#if INCLUDE_ICMPV6ECHO
+        } else if (hdr.icmpv6_echo.isValid()) {
+
+	    // Update our ethernet header
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Swap src and dst IPv6 addresses
+	    bit<128> tmp_ip;
+	    tmp_ip = hdr.ipv6.srcAddr;
+	    hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
+	    hdr.ipv6.dstAddr = tmp_ip;
+
+	    // Make sure we always reply from our unicast IP address
+	    if (hdr.ipv6.srcAddr != meta_ip_sa) {
+		// This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
+		cksum_swap_bit128(ckd, hdr.ipv6.srcAddr, meta_ip_sa);
+		hdr.ipv6.srcAddr = meta_ip_sa;
+	    }
+
+            // Change the type to be a reply, fixing up the header checksum
+	    cksum_sub_bit16(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    hdr.icmpv6_common.msg_type = 129;   // Echo Reply
+	    hdr.icmpv6_common.code = 0;
+	    cksum_add_bit16(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    cksum_update_header(hdr.icmpv6_common.checksum, ckd);
+
+	    return;
+#endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
@@ -888,8 +949,13 @@ control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata sho
 #endif  // INCLUDE_ICMPV4ECHO
 
         packet.emit(hdr.ipv6);
-#if INCLUDE_IPV6ND
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 	packet.emit(hdr.icmpv6_common);
+#endif // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+#if INCLUDE_ICMPV6ECHO
+	packet.emit(hdr.icmpv6_echo);
+#endif // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
 	packet.emit(hdr.ipv6nd_neigh_adv);
 	packet.emit(hdr.ipv6nd_option_common);
 	packet.emit(hdr.ipv6nd_option_lladdr);
