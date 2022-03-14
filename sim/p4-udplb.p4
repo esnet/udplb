@@ -10,7 +10,7 @@
 
 #define INCLUDE_ICMPV4ECHO 1
 #define INCLUDE_ICMPV6ECHO 1
-#define INCLUDE_IPV6ND 1
+#define INCLUDE_IPV6ND 0
 #define INCLUDE_ARP 1
 
 struct intrinsic_metadata_t {
@@ -319,7 +319,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ipv6);
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
-#if INCLUDE_IPV6ND
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 	    8w58: parse_icmpv6;
 #endif // INCLUDE_IPV6ND
             8w17: parse_udp;
@@ -330,8 +330,12 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
 	transition select(hdr.icmpv6_common.msg_type) {
+#if INCLUDE_ICMPV6ECHO
 	    8w128: parse_icmpv6_echo;
+#endif
+#if INCLUDE_IPV6ND
 	    8w135: parse_ipv6nd_neigh_sol;
+#endif	    
 	}
     }
 #endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
