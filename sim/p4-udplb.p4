@@ -332,10 +332,10 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 	transition select(hdr.icmpv6_common.msg_type) {
 #if INCLUDE_ICMPV6ECHO
 	    8w128: parse_icmpv6_echo;
-#endif
+#endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
 	    8w135: parse_ipv6nd_neigh_sol;
-#endif	    
+#endif  // INCLUDE_IPV6NS
 	}
     }
 #endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
