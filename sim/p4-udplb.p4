@@ -1,6 +1,18 @@
 #include <core.p4>
 #include <xsa.p4>
 
+// Decide if we want a checksum implementation that uses actions or uses macros
+#define CKSUM_MODE_USE_MACROS  1
+#define CKSUM_MODE_USE_ACTIONS 2
+#define CKSUM_MODE_OMITTED     3
+
+#define CKSUM_MODE CKSUM_MODE_USE_MACROS
+
+#define INCLUDE_ICMPV4ECHO 1
+#define INCLUDE_ICMPV6ECHO 1
+#define INCLUDE_IPV6ND 0
+#define INCLUDE_ARP 1
+
 struct intrinsic_metadata_t {
     bit<64> ingress_global_timestamp;
     bit<64> egress_global_timestamp;
@@ -14,6 +26,22 @@ header ethernet_t {
     bit<16> etherType;
 }
 
+#if INCLUDE_ARP
+
+header arp_t {
+    bit<16>  htype;
+    bit<16>  ptype;
+    bit<8>   hlen;
+    bit<8>   plen;
+    bit<16>  oper;
+    bit<48>  sha;
+    bit<32>  spa;
+    bit<48>  tha;
+    bit<32>  tpa;
+}
+
+#endif // INCLUDE_ARP
+
 header ipv6_t {
     bit<4>   version;
     bit<8>   trafficClass;
@@ -24,6 +52,49 @@ header ipv6_t {
     bit<128> srcAddr;
     bit<128> dstAddr;
 }
+
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+
+header icmpv6_common_t {
+    bit<8>   msg_type;
+    bit<8>   code;
+    bit<16>  checksum;
+}
+
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_ICMPV6ECHO
+
+header icmpv6_echo_t {
+    bit<16>  identifier;
+    bit<16>  sequence;
+}
+
+#endif  // INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_IPV6ND
+header ipv6nd_neigh_sol_t {
+    bit<32>  rsvd;
+    bit<128> target;
+}
+
+header ipv6nd_option_common_t {
+    bit<8>   option_type;
+    bit<8>   length;
+}
+
+header ipv6nd_option_lladdr_t {
+    bit<48>  ethernet_addr;
+}
+
+header ipv6nd_neigh_adv_t {
+    bit<1>   router_flag;
+    bit<1>   solicited_flag;
+    bit<1>   override_flag;
+    bit<29>  rsvd;
+    bit<128> target;
+}
+#endif // INCLUDE_IPV6ND
 
 header ipv4_t {
     bit<4>  version;
@@ -43,6 +114,19 @@ header ipv4_t {
 header ipv4_opt_t {
     varbit<320> options; // IPv4 options - length = (ipv4.hdr_len - 5) * 32
 }
+
+#if INCLUDE_ICMPV4ECHO
+header icmpv4_common_t {
+    bit<8>  msg_type;
+    bit<8>  code;
+    bit<16> checksum;
+}
+
+header icmpv4_echo_t {
+    bit<16>  identifier;
+    bit<16>  sequence;
+}
+#endif  // INCLUDE_ICMPV4ECHO
 
 header udp_t {
     bit<16> srcPort;
@@ -69,20 +153,129 @@ struct short_metadata {
 }
 
 struct headers {
-    ethernet_t       ethernet;
-    ipv4_t           ipv4;
-    ipv4_opt_t       ipv4_opt;
-    ipv6_t           ipv6;
-    udp_t            udp;
-    udplb_t          udplb;
+    ethernet_t              ethernet;
+#if INCLUDE_ARP
+    arp_t                   arp;
+#endif // INCLUDE_ARP
+    ipv4_t                  ipv4;
+    ipv4_opt_t              ipv4_opt;
+#if INCLUDE_ICMPV4ECHO
+    icmpv4_common_t         icmpv4_common;
+    icmpv4_echo_t           icmpv4_echo;
+#endif  // INCLUDE_ICMPV4ECHO
+    ipv6_t                  ipv6;
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+    icmpv6_common_t         icmpv6_common;
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+#if INCLUDE_ICMPV6ECHO
+    icmpv6_echo_t           icmpv6_echo;
+#endif  // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
+    ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
+    ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
+    ipv6nd_option_common_t  ipv6nd_option_common;
+    ipv6nd_option_lladdr_t  ipv6nd_option_lladdr;
+#endif // INCLUDE_IPV6ND
+    udp_t                   udp;
+    udplb_t                 udplb;
 }
 
 // User-defined errors 
 error {
+#if INCLUDE_ARP
+    UnhandledArpHType,
+    UnhandledArpPType,
+    UnhandledArpHLen,
+    UnhandledArpPLen,
+    UnhandledArpOper,
+#endif // INCLUDE_ARP
+#if INCLUDE_ICMPV4ECHO
+    InvalidICMPv4EchoCode,
+#endif  // INCLUDE_ICMPV4ECHO
+#if INCLUDE_ICMPV6ECHO
+    InvalidICMPv6EchoCode,
+#endif  // INCLUDE_ICMPV6ECHO
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
 }
+
+#if (CKSUM_MODE == CKSUM_MODE_OMITTED)
+#define cksum_update_header(h, cksum_delta) ;
+#define cksum_add_bit16(cksum, v) ;
+#define cksum_sub_bit16(cksum, v) ;
+#define cksum_swap_bit16(cksum, old, new) ;
+#define cksum_add_bit32(cksum, v) ;
+#define cksum_sub_bit32(cksum, v) ;
+#define cksum_swap_bit32(cksum, old, new) ;
+#define cksum_add_bit48(cksum, v) ;
+#define cksum_sub_bit48(cksum, v) ;
+#define cksum_swap_bit48(cksum, old, new) ;
+#define cksum_add_bit64(cksum, v) ;
+#define cksum_sub_bit64(cksum, v) ;
+#define cksum_swap_bit64(cksum, old, new) ;
+#define cksum_add_bit128(cksum, v) ;
+#define cksum_sub_bit128(cksum, v) ;
+#define cksum_swap_bit128(cksum, old, new) ;
+
+#elif (CKSUM_MODE == CKSUM_MODE_USE_MACROS)
+#define cksum_update_header(h, cksum_delta) \
+h = h ^ 0xffff; \
+cksum_add_bit16(h, cksum_delta); \
+h = h ^ 0xffff;
+
+#define cksum_swap_bit16(cksum, old, new) \
+cksum_sub_bit16(cksum, old); \
+cksum_add_bit16(cksum, new);
+
+#define cksum_add_bit32(cksum, v) \
+cksum_add_bit16(cksum, v[31:16]); \
+cksum_add_bit16(cksum, v[15:00]);
+
+#define cksum_sub_bit32(cksum, v) \
+cksum_sub_bit16(cksum, v[31:16]); \
+cksum_sub_bit16(cksum, v[15:00]);
+
+#define cksum_swap_bit32(cksum, old, new) \
+cksum_sub_bit32(cksum, old); \
+cksum_add_bit32(cksum, new);
+
+#define cksum_add_bit48(cksum, v) \
+cksum_add_bit16(cksum, v[47:32]); \
+cksum_add_bit32(cksum, v[31:00]);
+
+#define cksum_sub_bit48(cksum, v) \
+cksum_sub_bit16(cksum, v[47:32]); \
+cksum_sub_bit32(cksum, v[31:00]);
+
+#define cksum_swap_bit48(cksum, old, new) \
+cksum_sub_bit48(cksum, old); \
+cksum_add_bit48(cksum, new);
+
+#define cksum_add_bit64(cksum, v) \
+cksum_add_bit32(cksum, v[63:32]); \
+cksum_add_bit32(cksum, v[31:00]);
+
+#define cksum_sub_bit64(cksum, v) \
+cksum_sub_bit32(cksum, v[63:32]); \
+cksum_sub_bit32(cksum, v[31:00]);
+
+#define cksum_swap_bit64(cksum, old, new) \
+cksum_sub_bit64(cksum, old); \
+cksum_add_bit64(cksum, new);
+
+#define cksum_add_bit128(cksum, v) \
+cksum_add_bit64(cksum, v[127:64]); \
+cksum_add_bit64(cksum, v[63:0]);
+
+#define cksum_sub_bit128(cksum, v) \
+cksum_sub_bit64(cksum, v[127:64]); \
+cksum_sub_bit64(cksum, v[63:0]);
+
+#define cksum_swap_bit128(cksum, old, new) \
+cksum_sub_bit128(cksum, old); \
+cksum_add_bit128(cksum, new);
+#endif // CKSUM_MODE
 
 parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
     state start {
@@ -93,24 +286,106 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
+#if INCLUDE_ARP
+	    16w0x0806: parse_arp;
+#endif // INCLUDE_ARP
             16w0x86dd: parse_ipv6;
         }
     }
+
+#if INCLUDE_ARP
+    state parse_arp {
+	packet.extract(hdr.arp);
+	verify(hdr.arp.htype == 1, error.UnhandledArpHType);       // Ethernet
+	verify(hdr.arp.ptype == 0x0800, error.UnhandledArpPType);  // IPv4
+	verify(hdr.arp.hlen == 6, error.UnhandledArpHLen);         // MAC addr length (6)
+	verify(hdr.arp.plen == 4, error.UnhandledArpPLen);         // IPv4 addr length (4)
+	verify(hdr.arp.oper == 1, error.UnhandledArpOper);         // Request
+	transition accept;
+    }
+#endif // INCLUDE_ARP
+
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
 	verify(hdr.ipv4.version == 4 && hdr.ipv4.ihl >= 5, error.InvalidIPpacket);
         packet.extract(hdr.ipv4_opt, (((bit<32>)hdr.ipv4.ihl - 5) * 32));
         transition select(hdr.ipv4.protocol) {
+	    8w1: parse_icmpv4;
             8w17: parse_udp;
         }
     }
+
     state parse_ipv6 {
         packet.extract(hdr.ipv6);
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+	    8w58: parse_icmpv6;
+#endif // INCLUDE_IPV6ND
             8w17: parse_udp;
         }
     }
+
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+    state parse_icmpv6 {
+	packet.extract(hdr.icmpv6_common);
+	transition select(hdr.icmpv6_common.msg_type) {
+#if INCLUDE_ICMPV6ECHO
+	    8w128: parse_icmpv6_echo;
+#endif  // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
+	    8w135: parse_ipv6nd_neigh_sol;
+#endif  // INCLUDE_IPV6NS
+	}
+    }
+#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_ICMPV6ECHO
+    state parse_icmpv6_echo {
+	verify(hdr.icmpv6_common.code == 0, error.InvalidICMPv6EchoCode);
+	packet.extract(hdr.icmpv6_echo);
+	transition accept;
+    }
+#endif  // INCLUDE_ICMPV6ECHO
+
+#if INCLUDE_IPV6ND
+    state parse_ipv6nd_neigh_sol {
+	packet.extract(hdr.ipv6nd_neigh_sol);
+	transition select(hdr.ipv6.payloadLen) {
+	    16w24: accept;                        // No options
+	    default: parse_ipv6nd_option;         // Has at least one option
+	}
+    }
+
+    state parse_ipv6nd_option {
+	packet.extract(hdr.ipv6nd_option_common);
+	transition select(hdr.ipv6nd_option_common.option_type) {
+	    8w1: parse_ipv6nd_option_lladdr;
+	    default: accept;
+	}
+    }
+
+    state parse_ipv6nd_option_lladdr {
+	packet.extract(hdr.ipv6nd_option_lladdr);
+	transition accept;
+    }
+#endif // INCLUDE_IPV6ND
+
+#if INCLUDE_ICMPV4ECHO
+    state parse_icmpv4 {
+	packet.extract(hdr.icmpv4_common);
+	transition select(hdr.icmpv4_common.msg_type) {
+	    8w8: parse_icmpv4_echo;
+	}
+    }
+
+    state parse_icmpv4_echo {
+	verify(hdr.icmpv4_common.code == 0, error.InvalidICMPv4EchoCode);
+	packet.extract(hdr.icmpv4_echo);
+	transition accept;
+    }
+#endif  // INCLUDE_ICMPV4ECHO
+
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
@@ -129,24 +404,49 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
 control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
 
     //
-    // DstFilter
+    // MacDstFilter
     //
 
-    bit<128> meta_ipdst = 0;
+    bit<128> meta_ip_da = 0;
+    bit<48>  meta_mac_sa = 0;
+    bit<128> meta_ip_sa = 0;
 
     action drop() {
 	smeta.drop = 1;
     }
-    
-    table dst_filter_table {
+
+    action set_mac_sa(bit<48> mac_sa) {
+	meta_mac_sa = mac_sa;
+    }
+
+    table mac_dst_filter_table {
 	actions = {
 	    drop;
-	    NoAction;
+	    set_mac_sa;
 	}
 	key = {
 	    hdr.ethernet.dstAddr : exact;
+	}
+	size = 64;
+	default_action = drop;
+    }
+
+    //
+    // IPDstFilter
+    //
+
+    action set_ip_sa(bit<128> ip_sa) {
+	meta_ip_sa = ip_sa;
+    }
+
+    table ip_dst_filter_table {
+	actions = {
+	    drop;
+	    set_ip_sa;
+	}
+	key = {
 	    hdr.ethernet.etherType : exact;
-	    meta_ipdst : exact;
+	    meta_ip_da : exact;
 	}
 	size = 64;
 	default_action = drop;
@@ -203,34 +503,110 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     // MemberInfoLookup
     //
 
-    // Cumulative checksum delta due to field rewrites
-    bit<16> ckd = 0;
-
     bit<48>  new_mac_dst = 0x0;
     bit<32>  new_ip4_dst = 0x0;
     bit<128> new_ip6_dst = 0x0;
     bit<16>  new_udp_dst = 0x0;
 
-    action cksum_sub(inout bit<16> cksum, in bit<16> a) {
-	bit<18> sum = 2w00 ++ cksum;
-	bit<18> a_x = 2w00 ++ (a ^ 0xFFFF); 
+#if (CKSUM_MODE != CKSUM_MODE_OMITTED)
+    // Cumulative checksum delta due to field rewrites
+    bit<16> ckd = 0;
 
-	sum = sum + a_x;
+    // Checksum ops for bit<16>
+    action cksum_sub_bit16(inout bit<16> cksum, in bit<16> v) {
+	bit<18> sum = 2w00 ++ cksum;
+	bit<18> v_x = 2w00 ++ (v ^ 0xFFFF);
+
+	sum = sum + v_x;
 	cksum = sum[15:0] + (15w00 ++ sum[16:16]);
     }
 
-    action cksum_add(inout bit<16> cksum, in bit<16> a) {
+    action cksum_add_bit16(inout bit<16> cksum, in bit<16> v) {
 	bit<18> sum = 2w00 ++ cksum;
-	bit<18> a_x = 2w00 ++ a;
+	bit<18> v_x = 2w00 ++ v;
 	
-	sum = sum + a_x;
+	sum = sum + v_x;
 	cksum = sum[15:0] + (15w00 ++ sum[16:16]);
     }
+#endif // CKSUM_MODE
 
-    action cksum_swap(inout bit<16> cksum, in bit<16> old, in bit<16> new) {
-	cksum_sub(cksum, old);
-	cksum_add(cksum, new);
+#if (CKSUM_MODE == CKSUM_MODE_USE_ACTIONS)
+    action cksum_swap_bit16(inout bit<16> cksum, in bit<16> old, in bit<16> new) {
+	cksum_sub_bit16(cksum, old);
+	cksum_add_bit16(cksum, new);
     }
+
+    // Checksum ops for bit<32>
+    action cksum_sub_bit32(inout bit<16> cksum, in bit<32> v) {
+	cksum_sub_bit16(cksum, v[31:16]);
+	cksum_sub_bit16(cksum, v[15:00]);
+    }
+
+    action cksum_add_bit32(inout bit<16> cksum, in bit<32> v) {
+	cksum_add_bit16(cksum, v[31:16]);
+	cksum_add_bit16(cksum, v[15:00]);
+    }
+
+    action cksum_swap_bit32(inout bit<16> cksum, in bit<32> old, in bit<32> new) {
+	cksum_sub_bit32(cksum, old);
+	cksum_add_bit32(cksum, new);
+    }
+
+    // Checksum ops for bit<48>
+    action cksum_sub_bit48(inout bit<16> cksum, in bit<48> v) {
+	cksum_sub_bit16(cksum, v[47:32]);
+	cksum_sub_bit32(cksum, v[31:00]);
+    }
+
+    action cksum_add_bit48(inout bit<16> cksum, in bit<48> v) {
+	cksum_add_bit16(cksum, v[47:32]);
+	cksum_add_bit32(cksum, v[31:00]);
+    }
+
+    action cksum_swap_bit48(inout bit<16> cksum, in bit<48> old, in bit<48> new) {
+	cksum_sub_bit48(cksum, old);
+	cksum_add_bit48(cksum, new);
+    }
+
+    // Checksum ops for bit<64>
+    action cksum_sub_bit64(inout bit<16> cksum, in bit<64> v) {
+	cksum_sub_bit32(cksum, v[63:32]);
+	cksum_sub_bit32(cksum, v[31:00]);
+    }
+
+    action cksum_add_bit64(inout bit<16> cksum, in bit<64> v) {
+	cksum_add_bit32(cksum, v[63:32]);
+	cksum_add_bit32(cksum, v[31:00]);
+    }
+
+    action cksum_swap_bit64(inout bit<16> cksum, in bit<64> old, in bit<64> new) {
+	cksum_sub_bit64(cksum, old);
+	cksum_add_bit64(cksum, new);
+    }
+
+    // Checksum ops for bit<128>
+    action cksum_sub_bit128(inout bit<16> cksum, in bit<128> v) {
+	cksum_sub_bit64(cksum, v[127:64]);
+	cksum_sub_bit64(cksum, v[63:00]);
+    }
+
+    action cksum_add_bit128(inout bit<16> cksum, in bit<128> v) {
+	cksum_add_bit64(cksum, v[127:64]);
+	cksum_add_bit64(cksum, v[63:00]);
+    }
+
+    action cksum_swap_bit128(inout bit<16> cksum, in bit<128> old, in bit<128> new) {
+	cksum_sub_bit128(cksum, old);
+	cksum_add_bit128(cksum, new);
+    }
+
+    // Apply an accumulated delta to a header field
+    action cksum_update_header(inout bit<16> header_field, in bit<16> cksum_delta) {
+	header_field = header_field ^ 0xFFFF;
+	cksum_add_bit16(header_field, cksum_delta);
+	header_field = header_field ^ 0xFFFF;
+    }
+#endif // CKSUM_MODE
 
     action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
 	new_mac_dst = mac_dst;
@@ -238,18 +614,13 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	new_udp_dst = udp_dst;
     }
 
-
     action run_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
 	// Calculate IPv4 and UDP pseudo header checksum delta using rfc1624 method
-
-	cksum_swap(ckd, hdr.ipv4.dstAddr[31:16], ip_dst[31:16]);
-	cksum_swap(ckd, hdr.ipv4.dstAddr[15:00], ip_dst[15:00]);
-	cksum_swap(ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
+	cksum_swap_bit32(ckd, hdr.ipv4.dstAddr, ip_dst);
+	cksum_swap_bit16(ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
 
 	// Apply the accumulated delta to the IPv4 header checksum
-	hdr.ipv4.hdrChecksum = hdr.ipv4.hdrChecksum ^ 0xFFFF;
-	cksum_add(hdr.ipv4.hdrChecksum, ckd);
-	hdr.ipv4.hdrChecksum = hdr.ipv4.hdrChecksum ^ 0xFFFF;
+	cksum_update_header(hdr.ipv4.hdrChecksum, ckd);
 
 	hdr.ethernet.dstAddr = mac_dst;
 	hdr.ipv4.dstAddr = ip_dst;
@@ -268,17 +639,8 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 
     action run_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
 	// Calculate UDP pseudo header checksum delta using rfc1624 method
-
-	cksum_swap(ckd, hdr.ipv6.dstAddr[127:112], ip_dst[127:112]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[111:96],  ip_dst[111:96]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[95:80], ip_dst[95:80]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[79:64], ip_dst[79:64]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[63:48], ip_dst[63:48]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[47:32], ip_dst[47:32]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[31:16], ip_dst[31:16]);
-	cksum_swap(ckd, hdr.ipv6.dstAddr[15:00], ip_dst[15:00]);
-
-	cksum_swap(ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
+	cksum_swap_bit128(ckd, hdr.ipv6.dstAddr, ip_dst);
+	cksum_swap_bit16(ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
 
 	hdr.ethernet.dstAddr = mac_dst;
 	hdr.ipv6.dstAddr = ip_dst;
@@ -312,44 +674,211 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 	}
 
 	//
-	// DstFilter
+	// MacDstFilter
 	//
 
-	// Normalize the IP destination address
-	if (hdr.ipv4.isValid()) {
-	    meta_ipdst = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
-	} else if (hdr.ipv6.isValid()) {
-	    meta_ipdst = hdr.ipv6.dstAddr;
-	}
-	
-	hit = dst_filter_table.apply().hit;
+	hit = mac_dst_filter_table.apply().hit;
 	if (!hit) {
 	    return;
 	}
 
-	// Packet has been validated as being *to* our MAC DA and IP Dst
-	// We'll assume that the control plane is announcing ARP mappings that match the entries in the DstFilter table.
-	// Given that, any packet that we allow in should always be sent back out from the same consistent identity
-	// (MAC SA + IP Src).
-	// Copy the permitted MAC DA -> MAC SA.  This doesn't affect any checksums
-	hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+	//
+	// IPDstFilter
+	//
 
-	// Technically, we just want to rewrite the IP Src to be the load-balancer IP but that would require header
-	// checksum fixups.  Instead, we'll *Swap* the IP Dst and IP Src so that we are neutral on the IP/UDP checksums,
-	// knowing that the rest of the pipeline will eventually overwrite the (now bogus IP Dst) and fix up all checksums
-	// before sending the packet out.
+	// Normalize the IP destination address
 	if (hdr.ipv4.isValid()) {
-	    // Swap the IPv4 addresses using an intermediate temp var
-	    bit<32> tmpAddr;
-	    tmpAddr = hdr.ipv4.srcAddr;
-	    hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
-	    hdr.ipv4.dstAddr = tmpAddr;
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
 	} else if (hdr.ipv6.isValid()) {
-	    // Swap the IPv6 addresses using an intermediate temp var
-	    bit<128> tmpAddr;
-	    tmpAddr = hdr.ipv6.srcAddr;
+	    meta_ip_da = hdr.ipv6.dstAddr;
+#if INCLUDE_ARP
+	} else if (hdr.arp.isValid()) {
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
+#endif // INCLUDE_ARP
+	}
+
+	hit = ip_dst_filter_table.apply().hit;
+	if (!hit) {
+	    return;
+	}
+
+	if (false) {
+#if INCLUDE_ARP
+	// Handle ARP/ND requests
+	} else if (hdr.arp.isValid()) {
+	    // Make sure this is an ARP specifically for our unicast IPv4 address
+	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
+		drop();
+		return;
+	    }
+
+	    // Convert the request into a reply
+	    hdr.arp.oper = 2;
+	    // Swap sender/target HW address and fill in our unicast MAC as the sha
+	    hdr.arp.tha = hdr.arp.sha;
+	    hdr.arp.sha = meta_mac_sa;
+	    // Swap sender/target IP addresses
+	    hdr.arp.tpa = hdr.arp.spa;
+	    hdr.arp.spa = meta_ip_sa[31:0];
+
+	    // Send the ethernet frame back to the originator
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+	    return;
+#endif // INCLUDE_ARP
+#if INCLUDE_ICMPV4ECHO
+	} else if (hdr.icmpv4_echo.isValid()) {
+	    // Make sure this is a unicast ping for our unicast IPv4 address
+	    if (hdr.ipv4.dstAddr != meta_ip_sa[31:0]) {
+		drop();
+		return;
+	    }
+
+	    // Update our ethernet header
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Update our ipv4 header addresses
+	    hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
+	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
+
+	    // Change the type to be a reply, fixing up the header checksum
+	    cksum_sub_bit16(ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
+	    hdr.icmpv4_common.msg_type = 0;   // Echo Reply
+	    hdr.icmpv4_common.code = 0;
+	    cksum_add_bit16(ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
+	    cksum_update_header(hdr.icmpv4_common.checksum, ckd);
+
+	    return;
+#endif  // INCLUDE_ICMPV4ECHO
+#if INCLUDE_ICMPV6ECHO
+        } else if (hdr.icmpv6_echo.isValid()) {
+
+	    // Update our ethernet header
+	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Swap src and dst IPv6 addresses
+	    bit<128> tmp_ip;
+	    tmp_ip = hdr.ipv6.srcAddr;
 	    hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
-	    hdr.ipv6.dstAddr = tmpAddr;
+	    hdr.ipv6.dstAddr = tmp_ip;
+
+	    // Make sure we always reply from our unicast IP address
+	    if (hdr.ipv6.srcAddr != meta_ip_sa) {
+		// This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
+		cksum_swap_bit128(ckd, hdr.ipv6.srcAddr, meta_ip_sa);
+		hdr.ipv6.srcAddr = meta_ip_sa;
+	    }
+
+            // Change the type to be a reply, fixing up the header checksum
+	    cksum_sub_bit16(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    hdr.icmpv6_common.msg_type = 129;   // Echo Reply
+	    hdr.icmpv6_common.code = 0;
+	    cksum_add_bit16(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    cksum_update_header(hdr.icmpv6_common.checksum, ckd);
+
+	    return;
+#endif  // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
+	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
+	    bit<128> new_ip_da;
+	    bit<48>  new_mac_da;
+
+	    // Make sure this is an ND solicitation for our unicast IPv6 address
+	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
+		drop();
+		return;
+	    }
+
+	    // Figure out what our destination addresses should be based on the type of query we've received
+	    if (hdr.ipv6.srcAddr == 128w0) {
+		// Source is the unspecified address so reply to the all-nodes multicast IP
+		new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
+		new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
+	    } else {
+		// Reply to the originating source IP
+		new_ip_da = hdr.ipv6.srcAddr;
+
+		if (hdr.ipv6nd_option_lladdr.isValid()) {
+		    // The request includes a link-layer address for the originator, reply to that
+		    new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
+		} else {
+		    // No link-layer address option, reply to the unicast MAC from the original frame
+		    new_mac_da = hdr.ethernet.srcAddr;
+		}
+	    }
+
+	    // Update our ethernet header addresses
+	    hdr.ethernet.dstAddr = new_mac_da;
+	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    // Update our ipv6 header addresses
+	    hdr.ipv6.dstAddr = new_ip_da;
+	    hdr.ipv6.srcAddr = meta_ip_sa;
+
+	    // Reset our hop limit
+	    hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
+
+	    // Set our new payload length
+	    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
+
+	    // Fill out the ICMPv6 common header
+	    hdr.icmpv6_common.setValid();
+	    hdr.icmpv6_common.msg_type = 136;   // ND Advertisement
+	    hdr.icmpv6_common.code     = 0;
+	    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
+
+	    // Fill out our ND advertisement
+	    hdr.ipv6nd_neigh_adv.setValid();
+	    hdr.ipv6nd_neigh_adv.router_flag    = 0;
+	    hdr.ipv6nd_neigh_adv.solicited_flag = 1;
+	    hdr.ipv6nd_neigh_adv.override_flag  = 0;
+	    hdr.ipv6nd_neigh_adv.rsvd           = 0;
+	    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
+
+	    // Fill out the ND advertisement option common header
+	    hdr.ipv6nd_option_common.setValid();
+	    hdr.ipv6nd_option_common.option_type   = 2;   // Target Link-Layer Address
+	    hdr.ipv6nd_option_common.length        = 1;
+
+	    // Fill out the ND advertisement lladdr common header
+	    hdr.ipv6nd_option_lladdr.setValid();
+	    hdr.ipv6nd_option_lladdr.ethernet_addr = meta_mac_sa;
+
+	    // Calculate the checksum over the pseudo header + payload
+	    cksum_add_bit128(ckd, hdr.ipv6.srcAddr);
+	    cksum_add_bit128(ckd, hdr.ipv6.dstAddr);
+
+	    cksum_add_bit16(ckd, hdr.ipv6.payloadLen);
+	    cksum_add_bit16(ckd, 8w0 ++ hdr.ipv6.nextHdr);
+
+	    cksum_add_bit16(ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+
+	    cksum_add_bit16(ckd, hdr.ipv6nd_neigh_adv.router_flag ++ hdr.ipv6nd_neigh_adv.solicited_flag ++ hdr.ipv6nd_neigh_adv.override_flag ++ hdr.ipv6nd_neigh_adv.rsvd[28:16]);
+	    cksum_add_bit128(ckd, hdr.ipv6nd_neigh_adv.target);
+
+	    cksum_add_bit16(ckd, hdr.ipv6nd_option_common.option_type ++ hdr.ipv6nd_option_common.length);
+
+	    cksum_add_bit48(ckd, hdr.ipv6nd_option_lladdr.ethernet_addr);
+
+	    // Write the final checksum to the packet
+	    cksum_update_header(hdr.icmpv6_common.checksum, ckd);
+	    return;
+#endif // INCLUDE_IPV6ND
+	}
+
+	// All packets must be originated with our assigned unicast MAC address
+	hdr.ethernet.srcAddr = meta_mac_sa;
+
+	// All packets must be originated with our assigned unicast IP address
+	// Keep track of how our edit has affected the IP/pseudo-header checksums
+	if (hdr.ipv4.isValid()) {
+	    cksum_swap_bit32(ckd, hdr.ipv4.srcAddr, meta_ip_sa[31:0]);
+	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
+	} else if (hdr.ipv6.isValid()) {
+	    cksum_swap_bit128(ckd, hdr.ipv6.srcAddr, meta_ip_sa);
+	    hdr.ipv6.srcAddr = meta_ip_sa;
 	}
 
 	//
@@ -393,21 +922,16 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 
 	// Calculate UDP pseudo header checksum delta using rfc1624 method
 
-	cksum_swap(ckd, hdr.udp.dstPort, new_udp_dst);
-	cksum_swap(ckd, hdr.udp.totalLen, hdr.udp.totalLen - SIZEOF_UDPLB_HDR);
+	cksum_swap_bit16(ckd, hdr.udp.dstPort, new_udp_dst);
+	cksum_swap_bit16(ckd, hdr.udp.totalLen, hdr.udp.totalLen - SIZEOF_UDPLB_HDR);
 
 	// Subtract out the bytes of the UDP load-balance header
-	cksum_sub(ckd, hdr.udplb.magic);
-	cksum_sub(ckd, hdr.udplb.version ++ hdr.udplb.proto);
-	cksum_sub(ckd, hdr.udplb.tick[63:48]);
-	cksum_sub(ckd, hdr.udplb.tick[47:32]);
-	cksum_sub(ckd, hdr.udplb.tick[31:16]);
-	cksum_sub(ckd, hdr.udplb.tick[15:00]);
+	cksum_sub_bit16(ckd, hdr.udplb.magic);
+	cksum_sub_bit16(ckd, hdr.udplb.version ++ hdr.udplb.proto);
+	cksum_sub_bit64(ckd, hdr.udplb.tick);
 
 	// Write the updated checksum back into the packet
-	hdr.udp.checksum = hdr.udp.checksum ^ 0xFFFF;
-	cksum_add(hdr.udp.checksum, ckd);
-	hdr.udp.checksum = hdr.udp.checksum ^ 0xFFFF;
+	cksum_update_header(hdr.udp.checksum, ckd);
 
 	// Update the destination port and fix up the length to adapt to the dropped udplb header
 	hdr.udp.dstPort = new_udp_dst;
@@ -418,11 +942,29 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
 control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
+#if INCLUDE_ARP
+	packet.emit(hdr.arp);
+#endif // INCLUDE_ARP
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
+#if INCLUDE_ICMPV4ECHO
+	packet.emit(hdr.icmpv4_common);
+	packet.emit(hdr.icmpv4_echo);
+#endif  // INCLUDE_ICMPV4ECHO
+
         packet.emit(hdr.ipv6);
+#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+	packet.emit(hdr.icmpv6_common);
+#endif // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+#if INCLUDE_ICMPV6ECHO
+	packet.emit(hdr.icmpv6_echo);
+#endif // INCLUDE_ICMPV6ECHO
+#if INCLUDE_IPV6ND
+	packet.emit(hdr.ipv6nd_neigh_adv);
+	packet.emit(hdr.ipv6nd_option_common);
+	packet.emit(hdr.ipv6nd_option_lladdr);
+#endif // INCLUDE_IPV6ND
         packet.emit(hdr.udp);
-//	packet.emit(hdr.udplb);
     }
 }
 

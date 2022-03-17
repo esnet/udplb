@@ -1,5 +1,38 @@
-table_add dst_filter_table NoAction 0x00aabbccddee 0x0800 0x0000000000000000000000000a010203 =>
-table_add dst_filter_table NoAction 0x00aabbccddee 0x86dd 0xfe800000000000000000000000000002 =>
+# Simulated configuration
+#   LB unicast MAC : 00:aa:bb:cc:dd:ee
+#   LB IPv4 Net    : 10.1.2.0/24
+#   LB unicast IPv4: 10.1.2.3
+#   LB IPv6 ULA Net: fd9f:53b7:a261:48ed/64
+#   LB unicast IPv6: fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee/128
+
+#
+# MAC DST FILTER
+#
+
+# Unicast
+table_add mac_dst_filter_table set_mac_sa 0x00aabbccddee => 0x00aabbccddee
+# IPv6 Solicited Node Multicast Address
+table_add mac_dst_filter_table set_mac_sa 0x3333ffccddee => 0x00aabbccddee
+# Broadcast
+table_add mac_dst_filter_table set_mac_sa 0xffffffffffff => 0x00aabbccddee
+# IPv6 All Nodes Link-Local Multicast
+table_add mac_dst_filter_table set_mac_sa 0x333300000002 => 0x00aabbccddee
+
+#
+# IP DST FILTER
+#
+
+# IPv4 Unicast
+table_add ip_dst_filter_table set_ip_sa 0x0800 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203
+# ARP Target Protocol Address
+table_add ip_dst_filter_table set_ip_sa 0x0806 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203
+# IPv6 Unicast
+table_add ip_dst_filter_table set_ip_sa 0x86dd 0xfd9f53b7a26148ed02aabbfffeccddee => 0xfd9f53b7a26148ed02aabbfffeccddee
+# IPv6 Solicited Node Multicast Address
+table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff0200000000000000000001ffccddee => 0xfd9f53b7a26148ed02aabbfffeccddee
+# IPv6 All Nodes Link-Local Multicast
+table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee
+
 table_add epoch_assign_table do_assign_epoch 0x0000000000000000/0 => 0x00000000 64
 table_add epoch_assign_table do_assign_epoch 0x0000000000000010/60 => 0x00000001 5
 table_add load_balance_calendar_table do_assign_member 0x00000000 0x00a => 0x0000
