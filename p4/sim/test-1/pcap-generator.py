@@ -8,6 +8,8 @@ class UDPLB(Packet):
         XShortField("magic", 0x4C42),
         XByteField("version", 1),
         XByteField("proto", 0),
+        XShortField("rsvd", 0),
+        XShortField("entropy", 0),
         XLongField("tick", 0),
     ]
 
@@ -54,10 +56,10 @@ with scapy.utils.PcapWriter('packets_in.pcap', linktype=DLT_EN10MB) as w:
             # last (possibly short) segment
             flags.append("last")
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w._write_packet(p)
         #print(p.show())
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w._write_packet(p)
         #print(p.show())

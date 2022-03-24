@@ -141,9 +141,11 @@ header udplb_t {
     bit<16> magic; 		/* LB */
     bit<8> version;		/* version 0 */
     bit<8> proto;
+    bit<16> rsvd;
+    bit<16> entropy;
     bit<64> tick;
 }
-#define SIZEOF_UDPLB_HDR 12
+#define SIZEOF_UDPLB_HDR 16
 
 struct headers {
     ethernet_t              ethernet;
@@ -496,10 +498,39 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     // MemberInfoLookup
     //
 
-    bit<48>  new_mac_dst = 0x0;
-    bit<32>  new_ip4_dst = 0x0;
-    bit<128> new_ip6_dst = 0x0;
-    bit<16>  new_udp_dst = 0x0;
+    bit<48>  new_mac_dst          = 0;
+    bit<32>  new_ip4_dst          = 0;
+    bit<128> new_ip6_dst          = 0;
+    bit<16>  meta_udp_base        = 0;
+    bit<8>   meta_entropy_bit_cnt = 0;
+
+    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt) {
+	new_mac_dst          = mac_dst;
+	new_ip4_dst          = ip_dst;
+	meta_udp_base        = udp_base;
+	meta_entropy_bit_cnt = entropy_bit_cnt;
+    }
+
+    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt) {
+	new_mac_dst          = mac_dst;
+	new_ip6_dst          = ip_dst;
+	meta_udp_base        = udp_base;
+	meta_entropy_bit_cnt = entropy_bit_cnt;
+    }
+
+    table member_info_lookup_table {
+	actions = {
+	    do_ipv4_member_rewrite;
+	    do_ipv6_member_rewrite;
+	    drop;
+	}
+	key = {
+	    hdr.ethernet.etherType : exact;
+	    meta_member_id : exact;
+	}
+	size = 1024;
+	default_action = drop;
+    }
 
 #if (CKSUM_MODE != CKSUM_MODE_OMITTED)
     // Cumulative checksum delta due to field rewrites
@@ -600,61 +631,6 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	header_field = header_field ^ 0xFFFF;
     }
 #endif // CKSUM_MODE
-
-    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
-	new_mac_dst = mac_dst;
-	new_ip4_dst  = ip_dst;
-	new_udp_dst = udp_dst;
-    }
-
-    action run_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_dst) {
-	// Calculate IPv4 and UDP pseudo header checksum delta using rfc1624 method
-	cksum_swap_bit32(ckd, hdr.ipv4.dstAddr, ip_dst);
-	cksum_swap_bit16(ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
-
-	// Apply the accumulated delta to the IPv4 header checksum
-	cksum_update_header(hdr.ipv4.hdrChecksum, ckd);
-
-	hdr.ethernet.dstAddr = mac_dst;
-	hdr.ipv4.dstAddr = ip_dst;
-	hdr.ipv4.totalLen = hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR;
-
-	new_udp_dst = udp_dst;
-    }
-
-
-    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
-	new_mac_dst = mac_dst;
-	new_ip6_dst = ip_dst;
-	new_udp_dst = udp_dst;
-    }
-
-
-    action run_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_dst) {
-	// Calculate UDP pseudo header checksum delta using rfc1624 method
-	cksum_swap_bit128(ckd, hdr.ipv6.dstAddr, ip_dst);
-	cksum_swap_bit16(ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
-
-	hdr.ethernet.dstAddr = mac_dst;
-	hdr.ipv6.dstAddr = ip_dst;
-	hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - 12;
-	new_udp_dst = udp_dst;
-    }
-
-
-    table member_info_lookup_table {
-	actions = {
-	    do_ipv4_member_rewrite;
-	    do_ipv6_member_rewrite;
-	    drop;
-	}
-	key = {
-	    hdr.ethernet.etherType : exact;
-	    meta_member_id : exact;
-	}
-	size = 1024;
-	default_action = drop;
-    }
 
     // Entry Point
     apply {
@@ -900,14 +876,35 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	hit = member_info_lookup_table.apply().hit;
 	if (!hit) {
 	    return;
-	} else {
-	  if (hdr.ipv4.isValid()) {
-            run_ipv4_member_rewrite(new_mac_dst,new_ip4_dst,new_udp_dst);
-	  }
-	  if (hdr.ipv6.isValid()) {
-	    run_ipv6_member_rewrite(new_mac_dst,new_ip6_dst,new_udp_dst);
-	  }
-        }
+	}
+
+	// Set the MAC DA to point to the next hop at L2
+	hdr.ethernet.dstAddr = new_mac_dst;
+
+	// Set the IP Dst to point to the L3 destination
+
+	if (hdr.ipv4.isValid()) {
+	    // Calculate IPv4 and UDP pseudo header checksum delta using rfc1624 method
+	    cksum_swap_bit32(ckd, hdr.ipv4.dstAddr, new_ip4_dst);
+	    cksum_swap_bit16(ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
+
+	    // Apply the accumulated delta to the IPv4 header checksum
+	    cksum_update_header(hdr.ipv4.hdrChecksum, ckd);
+
+	    hdr.ipv4.dstAddr = new_ip4_dst;
+	    hdr.ipv4.totalLen = hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR;
+	}
+	if (hdr.ipv6.isValid()) {
+	    // Calculate UDP pseudo header checksum delta using rfc1624 method
+	    cksum_swap_bit128(ckd, hdr.ipv6.dstAddr, new_ip6_dst);
+	    cksum_swap_bit16(ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
+
+	    hdr.ipv6.dstAddr = new_ip6_dst;
+	    hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR;
+	}
+
+	// Compute the UDP dst_port between [base, base+2^entropy_bit_count) by mixing in some of the provided entropy
+	bit<16> new_udp_dst = meta_udp_base + (hdr.udplb.entropy & (bit<16>)(((bit<16>)1 << meta_entropy_bit_cnt)-1));
 
 	//
 	// UpdateUDPChecksum
