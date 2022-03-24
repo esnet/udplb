@@ -13,11 +13,13 @@
 #define INCLUDE_IPV6ND 0
 #define INCLUDE_ARP 1
 
-struct intrinsic_metadata_t {
+struct platform_metadata {
     bit<64> ingress_global_timestamp;
-    bit<64> egress_global_timestamp;
-    bit<16> mcast_grp;
-    bit<16> egress_rid;
+    bit<2>  dest_port;
+    bit<1>  truncate_enable;
+    bit<16> packet_length;
+    bit<1>  rss_override_enable;
+    bit<8>  rss_override;
 }
 
 header ethernet_t {
@@ -142,15 +144,6 @@ header udplb_t {
     bit<64> tick;
 }
 #define SIZEOF_UDPLB_HDR 12
-
-struct short_metadata {
-    bit<64> ingress_global_timestamp;
-    bit<2>  dest_port;
-    bit<1>  truncate_enable;
-    bit<16> packet_length;
-    bit<1>  rss_override_enable;
-    bit<8>  rss_override;
-}
 
 struct headers {
     ethernet_t              ethernet;
@@ -277,7 +270,7 @@ cksum_sub_bit128(cksum, old); \
 cksum_add_bit128(cksum, new);
 #endif // CKSUM_MODE
 
-parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
+parser ParserImpl(packet_in packet, out headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
     state start {
         transition parse_ethernet;
     }
@@ -401,7 +394,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout short_metadata short_
     }
 }
 
-control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
+control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
 
     //
     // MacDstFilter
@@ -939,7 +932,7 @@ control MatchActionImpl(inout headers hdr, inout short_metadata short_meta, inou
     }
 }
 
-control DeparserImpl(packet_out packet, in headers hdr, inout short_metadata short_meta, inout standard_metadata_t smeta) {
+control DeparserImpl(packet_out packet, in headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
 #if INCLUDE_ARP
