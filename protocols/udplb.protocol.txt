@@ -1,1 +1,1 @@
-L:8,B:8,Version:8,Protocol:8,Tick:64
+L:8,B:8,Version:8,Protocol:8,Rsvd:16,Entropy:16,Tick:64
