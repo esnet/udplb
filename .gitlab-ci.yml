@@ -28,7 +28,7 @@ p4bm:
   stage: p4_sim
   extends: .common
   script:
-    - make -C p4/sim build sim-all test-all
+    - make -C p4/sim build sim-all
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
