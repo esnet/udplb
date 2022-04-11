@@ -2,7 +2,7 @@
 *_out.pcap
 *_out.pcap.txt
 *_out_final.pcap
-runsim.txt_*
+runsim.log_*.txt
 sim-out.txt
 !test-*/expected/*_out.meta
 !test-*/expected/*_out.pcap
