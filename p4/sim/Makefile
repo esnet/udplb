@@ -44,6 +44,7 @@ sim-all:
 sim: build
 # Make sure that $(P4BM_DIR)/$(P4BM_SCRIPT) exists (avoids issues if script is missing).
 	(cd $(P4BM_DIR) && wc $(P4BM_SCRIPT) > /dev/null)
+	[ ! -x $(P4BM_DIR)/pcap-generator.py ] || (cd $(P4BM_DIR) && ./pcap-generator.py)
 	(cd $(P4BM_DIR) && $(RUN_P4BM_SDNET) -l $(P4BM_LOGFILE_PREFIX) --json $(P4_OBJECT_TEST) -s $(P4BM_SCRIPT))
 
 build: $(P4_OBJECT)
