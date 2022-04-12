@@ -87,6 +87,11 @@ export_hwapi:
 
 trigger_downstream_job:
   stage: trigger_downstream
+  variables:
+    SN_HW_GROUP: $CI_PROJECT_NAMESPACE
+    SN_HW_REPO: $CI_PROJECT_NAME
+    SN_HW_BRANCH: $CI_COMMIT_BRANCH
+
   trigger:
     project: ht/esnet-smartnic-fw
     branch: main
