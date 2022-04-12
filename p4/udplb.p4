@@ -918,6 +918,8 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	// Subtract out the bytes of the UDP load-balance header
 	cksum_sub_bit16(ckd, hdr.udplb.magic);
 	cksum_sub_bit16(ckd, hdr.udplb.version ++ hdr.udplb.proto);
+	cksum_sub_bit16(ckd, hdr.udplb.rsvd);
+	cksum_sub_bit16(ckd, hdr.udplb.entropy);
 	cksum_sub_bit64(ckd, hdr.udplb.tick);
 
 	// Write the updated checksum back into the packet
