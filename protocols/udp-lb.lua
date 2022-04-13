@@ -4,12 +4,16 @@ local p_udplb = Proto("udplb", "UDP Load Balancer Protocol")
 local f_magic = ProtoField.string("udplb.magic", "Magic", base.ASCII)
 local f_version = ProtoField.uint8("udplb.version", "Version", base.DEC)
 local f_proto = ProtoField.uint8("udplb.proto", "Protocol", base.HEX)
+local f_rsvd = ProtoField.uint16("udplb.rsvd", "Reserved", base.HEX)
+local f_entropy = ProtoField.uint16("udplb.entropy", "Entropy", base.HEX)
 local f_tick = ProtoField.uint64("udplb.tick", "Tick", base.HEX)
 
 p_udplb.fields = {
    f_magic,
    f_version,
    f_proto,
+   f_rsvd,
+   f_entropy,
    f_tick,
 }
 
@@ -23,7 +27,9 @@ function p_udplb.dissector(buf, pkt, tree)
    t:add(f_magic, buf(0,2))
    t:add(f_version, buf(2,1))
    t:add(f_proto, buf(3,1))
-   t:add(f_tick, buf(4,8))
+   t:add(f_rsvd, buf(4,2))
+   t:add(f_entropy, buf(6,2))
+   t:add(f_tick, buf(8,8))
 
    -- local proto = buf(13,1):uint()
    local dissector = p_udplb_encap_table:get_dissector(proto()())

@@ -33,12 +33,12 @@ table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff0200000000000000000001ffccdde
 # IPv6 All Nodes Link-Local Multicast
 table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee
 
-table_add epoch_assign_table do_assign_epoch 0x0000000000000000/0 => 0x00000000 64
+table_add epoch_assign_table do_assign_epoch 0x0000000000000000/0 => 0x00000000 63
 table_add epoch_assign_table do_assign_epoch 0x0000000000000010/60 => 0x00000001 5
 table_add load_balance_calendar_table do_assign_member 0x00000000 0x00a => 0x0000
 table_add load_balance_calendar_table do_assign_member 0x00000001 0x014 => 0x0000
-table_add member_info_lookup_table do_ipv4_member_rewrite 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556
-table_add member_info_lookup_table do_ipv6_member_rewrite 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556
+table_add member_info_lookup_table do_ipv4_member_rewrite 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4
+table_add member_info_lookup_table do_ipv6_member_rewrite 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4
 
 run_traffic packets
 
