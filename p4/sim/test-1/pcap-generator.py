@@ -6,7 +6,7 @@ class UDPLB(Packet):
     name = "UDP LB Packet"
     fields_desc = [
         XShortField("magic", 0x4C42),
-        XByteField("version", 1),
+        XByteField("version", 2),
         XByteField("proto", 0),
         XShortField("rsvd", 0),
         XShortField("entropy", 0),

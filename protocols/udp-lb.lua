@@ -36,7 +36,7 @@ function p_udplb.dissector(buf, pkt, tree)
 
    if dissector ~= nil then
       -- found a dissector
-      dissector:call(buf(12):tvb(), pkt, tree)
+      dissector:call(buf(16):tvb(), pkt, tree)
    else
       pkt.cols.protocol:set("UDP-LB")
       pkt.cols.packet_len:set(buf:len())
