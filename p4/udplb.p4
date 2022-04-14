@@ -139,7 +139,7 @@ header udp_t {
 
 header udplb_t {
     bit<16> magic; 		/* LB */
-    bit<8> version;		/* version 0 */
+    bit<8> version;
     bit<8> proto;
     bit<16> rsvd;
     bit<16> entropy;
@@ -391,7 +391,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout platform_metadata pme
     state parse_udplb {
       packet.extract(hdr.udplb);
       verify(hdr.udplb.magic == 0x4c42, error.InvalidUDPLBmagic);
-      verify(hdr.udplb.version == 1, error.InvalidUDPLBversion);
+      verify(hdr.udplb.version == 2, error.InvalidUDPLBversion);
       transition accept;
     }
 }
