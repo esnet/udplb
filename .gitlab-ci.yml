@@ -12,8 +12,6 @@ variables:
 
 .common:
   image: $CI_REGISTRY/ht/xilinx-tools-docker:21975-g8bb7b6c3
-  tags:
-    - ht-docker
   before_script:
     - source /opt/Xilinx/Vivado/2021.2/settings64.sh
   variables:
@@ -26,6 +24,8 @@ variables:
 p4bm:
   stage: p4_sim
   extends: .common
+  tags:
+    - ht-sim
   script:
     - apt update -y
     - apt install -y python3-setuptools
@@ -40,6 +40,8 @@ p4bm:
 build_bitfile:
   stage: bitfile
   extends: .common
+  tags:
+    - ht-synth
   script:
     - make build BUILD_NAME=open-nic-ci
   artifacts:
@@ -66,6 +68,8 @@ build_bitfile:
 export_hwapi:
   stage: package
   extends: .common
+  tags:
+    - ht-misc
   before_script: []
   script:
     - unzip artifacts/open-nic-ci/artifacts.esnet-smartnic-hw.export_hwapi.0.zip
