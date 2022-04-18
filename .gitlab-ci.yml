@@ -91,10 +91,11 @@ export_hwapi:
 trigger_downstream_job:
   stage: trigger_downstream
   variables:
-    SN_HW_GROUP: $CI_PROJECT_NAMESPACE
-    SN_HW_REPO: $CI_PROJECT_NAME
-    SN_HW_BRANCH: $CI_COMMIT_BRANCH
-
+    SN_HW_GROUP: ht
+    SN_HW_REPO: udplb
+    SN_HW_BRANCH: main
+    SN_HW_API_JOB: export_hwapi
+    SN_HW_APP_NAME: udplb
   trigger:
     project: ht/esnet-smartnic-fw
     branch: main
