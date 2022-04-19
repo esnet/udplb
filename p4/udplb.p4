@@ -10,7 +10,7 @@
 
 #define INCLUDE_ICMPV4ECHO 1
 #define INCLUDE_ICMPV6ECHO 1
-#define INCLUDE_IPV6ND 0
+#define INCLUDE_IPV6ND 1
 #define INCLUDE_ARP 1
 
 struct platform_metadata {
