@@ -24,6 +24,8 @@ export SMARTNIC_DIR := $(APP_DIR)/esnet-smartnic-hw
 # BUILD_NAME - Name of subdirectory for artifacts of latest build i.e. artifacts go to $(ARTIFACTS_DIR)/$(BUILD_NAME)
 #export BUILD_NAME := esnet-smartnic-$(APP_NAME)
 
+export max_pkt_len = 9100
+
 
 #------- Targets -------
 
