@@ -751,7 +751,6 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 #endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
-	    bit<16>  v6nd0_ckd = 0;
 	    bit<128> new_ip_da;
 	    bit<48>  new_mac_da;
 
@@ -817,27 +816,30 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    hdr.ipv6nd_option_lladdr.ethernet_addr = meta_mac_sa;
 
 	    // Calculate the checksum over the pseudo header + payload
+	    bit<16>  v6nd0_ckd = 0;
 	    cksum_add_bit128(v6nd0_ckd, hdr.ipv6.srcAddr);
-	    cksum_add_bit128(v6nd0_ckd, hdr.ipv6.dstAddr);
-
-	    bit<16> v6nd1_ckd = v6nd0_ckd;
-
-	    cksum_add_bit16(v6nd1_ckd, hdr.ipv6.payloadLen);
-	    cksum_add_bit16(v6nd1_ckd, 8w0 ++ hdr.ipv6.nextHdr);
-
-	    cksum_add_bit16(v6nd1_ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
-
-	    cksum_add_bit16(v6nd1_ckd, hdr.ipv6nd_neigh_adv.router_flag ++ hdr.ipv6nd_neigh_adv.solicited_flag ++ hdr.ipv6nd_neigh_adv.override_flag ++ hdr.ipv6nd_neigh_adv.rsvd[28:16]);
-	    cksum_add_bit128(v6nd1_ckd, hdr.ipv6nd_neigh_adv.target);
+	    bit<16>  v6nd1_ckd = v6nd0_ckd;
+	    cksum_add_bit128(v6nd1_ckd, hdr.ipv6.dstAddr);
 
 	    bit<16> v6nd2_ckd = v6nd1_ckd;
 
-	    cksum_add_bit16(v6nd2_ckd, hdr.ipv6nd_option_common.option_type ++ hdr.ipv6nd_option_common.length);
+	    cksum_add_bit16(v6nd2_ckd, hdr.ipv6.payloadLen);
+	    cksum_add_bit16(v6nd2_ckd, 8w0 ++ hdr.ipv6.nextHdr);
 
-	    cksum_add_bit48(v6nd2_ckd, hdr.ipv6nd_option_lladdr.ethernet_addr);
+	    cksum_add_bit16(v6nd2_ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+
+	    cksum_add_bit16(v6nd2_ckd, hdr.ipv6nd_neigh_adv.router_flag ++ hdr.ipv6nd_neigh_adv.solicited_flag ++ hdr.ipv6nd_neigh_adv.override_flag ++ hdr.ipv6nd_neigh_adv.rsvd[28:16]);
+	    bit<16> v6nd3_ckd = v6nd2_ckd;
+	    cksum_add_bit128(v6nd3_ckd, hdr.ipv6nd_neigh_adv.target);
+
+	    bit<16> v6nd4_ckd = v6nd3_ckd;
+
+	    cksum_add_bit16(v6nd4_ckd, hdr.ipv6nd_option_common.option_type ++ hdr.ipv6nd_option_common.length);
+
+	    cksum_add_bit48(v6nd4_ckd, hdr.ipv6nd_option_lladdr.ethernet_addr);
 
 	    // Write the final checksum to the packet
-	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd2_ckd);
+	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd4_ckd);
 	    return;
 #endif // INCLUDE_IPV6ND
 	}
