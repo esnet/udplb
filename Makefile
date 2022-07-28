@@ -1,10 +1,7 @@
 #------- Mandatory variables -------
 
-# APP_DIR must be set to the pathname of application root directory.
-export APP_DIR := $(CURDIR)
-
 # SMARTNIC_DIR must be set to the pathname of smartnic root directory.
-export SMARTNIC_DIR := $(APP_DIR)/esnet-smartnic-hw
+ SMARTNIC_DIR := ./esnet-smartnic-hw
 
 
 #------- Optional variables -------
@@ -12,7 +9,7 @@ export SMARTNIC_DIR := $(APP_DIR)/esnet-smartnic-hw
 # The following variables are optionally configured in this Makefile, or the command line.
 # If NOT configured, each of these variables gets a default value in the smarnic Makefile, as specified below.
 
-# APP_NAME - Used for default naming conventions below.
+# APP_NAME - Application name. Used for default naming conventions below.
 #export APP_NAME := $(shell basename $(APP_DIR) )
 
 # P4_FILE - Full pathname of application p4 file.
@@ -30,15 +27,18 @@ export max_pkt_len = 9100
 #------- Targets -------
 
 build:
-	$(MAKE) -C $(SMARTNIC_DIR) build
+	$(MAKE) -C $(SMARTNIC_DIR) build APP_DIR=$(CURDIR)
+
+config:
+	$(MAKE) -C $(SMARTNIC_DIR) config APP_DIR=$(CURDIR)
 
 clean_build:
-	$(MAKE) -C $(SMARTNIC_DIR) clean_build
+	$(MAKE) -C $(SMARTNIC_DIR) clean_build APP_DIR=$(CURDIR)
 
 clean_artifacts:
-	$(MAKE) -C $(SMARTNIC_DIR) clean_artifacts
+	$(MAKE) -C $(SMARTNIC_DIR) clean_artifacts APP_DIR=$(CURDIR)
 
 package:
-	$(MAKE) -C $(SMARTNIC_DIR) package
+	$(MAKE) -C $(SMARTNIC_DIR) package APP_DIR=$(CURDIR)
 
-.PHONY: build clean_build clean_artifacts
+.PHONY: build config clean_build clean_artifacts
