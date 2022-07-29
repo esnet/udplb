@@ -1,2 +1,2 @@
 compile :
-	p4c-vitisnet p4_simple.p4
+	p4c-vitisnet udplb.p4
