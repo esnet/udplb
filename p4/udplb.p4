@@ -96,6 +96,16 @@ header ipv6nd_neigh_adv_t {
     bit<29>  rsvd;
     bit<128> target;
 }
+
+header ipv6nd_adv_option_common_t {
+    bit<8>   option_type;
+    bit<8>   length;
+}
+
+header ipv6nd_adv_option_lladdr_t {
+    bit<48>  ethernet_addr;
+}
+
 #endif // INCLUDE_IPV6ND
 
 header ipv4_t {
@@ -167,9 +177,12 @@ struct headers {
 #endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
     ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
-    ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
     ipv6nd_option_common_t  ipv6nd_option_common;
     ipv6nd_option_lladdr_t  ipv6nd_option_lladdr;
+
+    ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
+    ipv6nd_adv_option_common_t  ipv6nd_adv_option_common;
+    ipv6nd_adv_option_lladdr_t  ipv6nd_adv_option_lladdr;
 #endif // INCLUDE_IPV6ND
     udp_t                   udp;
     udplb_t                 udplb;
@@ -807,13 +820,13 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
 
 	    // Fill out the ND advertisement option common header
-	    hdr.ipv6nd_option_common.setValid();
-	    hdr.ipv6nd_option_common.option_type   = 2;   // Target Link-Layer Address
-	    hdr.ipv6nd_option_common.length        = 1;
+	    hdr.ipv6nd_adv_option_common.setValid();
+	    hdr.ipv6nd_adv_option_common.option_type   = 2;   // Target Link-Layer Address
+	    hdr.ipv6nd_adv_option_common.length        = 1;
 
 	    // Fill out the ND advertisement lladdr common header
-	    hdr.ipv6nd_option_lladdr.setValid();
-	    hdr.ipv6nd_option_lladdr.ethernet_addr = meta_mac_sa;
+	    hdr.ipv6nd_adv_option_lladdr.setValid();
+	    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = meta_mac_sa;
 
 	    // Calculate the checksum over the pseudo header + payload
 	    bit<16>  v6nd0_ckd = 0;
@@ -834,9 +847,9 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 
 	    bit<16> v6nd4_ckd = v6nd3_ckd;
 
-	    cksum_add_bit16(v6nd4_ckd, hdr.ipv6nd_option_common.option_type ++ hdr.ipv6nd_option_common.length);
+	    cksum_add_bit16(v6nd4_ckd, hdr.ipv6nd_adv_option_common.option_type ++ hdr.ipv6nd_adv_option_common.length);
 
-	    cksum_add_bit48(v6nd4_ckd, hdr.ipv6nd_option_lladdr.ethernet_addr);
+	    cksum_add_bit48(v6nd4_ckd, hdr.ipv6nd_adv_option_lladdr.ethernet_addr);
 
 	    // Write the final checksum to the packet
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd4_ckd);
@@ -962,8 +975,8 @@ control DeparserImpl(packet_out packet, in headers hdr, inout platform_metadata 
 #endif // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
 	packet.emit(hdr.ipv6nd_neigh_adv);
-	packet.emit(hdr.ipv6nd_option_common);
-	packet.emit(hdr.ipv6nd_option_lladdr);
+	packet.emit(hdr.ipv6nd_adv_option_common);
+	packet.emit(hdr.ipv6nd_adv_option_lladdr);
 #endif // INCLUDE_IPV6ND
         packet.emit(hdr.udp);
     }
