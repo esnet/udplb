@@ -3,6 +3,7 @@ include:
 
 stages:
   - p4_sim
+  - rtl_sim
   - bitfile
   - package
   - trigger_downstream
@@ -36,6 +37,24 @@ p4bm:
     paths:
       - p4/sim
   needs: []
+
+sim:
+  stage: rtl_sim
+  extends: .common
+  tags:
+    - ht-sim
+  script:
+    - make -C tests/regression
+    - grep 'PASSED.*suites passing' tests/regression/run_0/sim.log
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+    reports:
+      junit:
+        - tests/regression/run_0/tests.xml
+    when: always
+  timeout: 2h
+  needs:
+    - p4bm
 
 build_bitfile:
   stage: bitfile
