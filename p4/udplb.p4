@@ -360,8 +360,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout platform_metadata pme
     state parse_ipv6nd_neigh_sol {
 	packet.extract(hdr.ipv6nd_neigh_sol);
 	transition select(hdr.ipv6.payloadLen) {
-	    16w24: accept;                        // No options
 	    default: parse_ipv6nd_option;         // Has at least one option
+	    16w24: accept;                        // No options
 	}
     }
 
