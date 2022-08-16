@@ -16,7 +16,7 @@ table_add mac_dst_filter_table set_mac_sa 0x3333ffccddee => 0x00aabbccddee
 # Broadcast
 table_add mac_dst_filter_table set_mac_sa 0xffffffffffff => 0x00aabbccddee
 # IPv6 All Nodes Link-Local Multicast
-table_add mac_dst_filter_table set_mac_sa 0x333300000002 => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0x333300000001 => 0x00aabbccddee
 
 #
 # IP DST FILTER
