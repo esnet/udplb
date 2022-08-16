@@ -418,6 +418,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     bit<128> meta_ip_da = 0;
     bit<48>  meta_mac_sa = 0;
     bit<128> meta_ip_sa = 0;
+    bit<2>   meta_lb_id = 0;
 
     action drop() {
 	smeta.drop = 1;
@@ -443,8 +444,9 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     // IPDstFilter
     //
 
-    action set_ip_sa(bit<128> ip_sa) {
+    action set_ip_sa(bit<128> ip_sa, bit<2> lb_id) {
 	meta_ip_sa = ip_sa;
+	meta_lb_id = lb_id;
     }
 
     table ip_dst_filter_table {
@@ -476,9 +478,10 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    hdr.udplb.tick : lpm;
 	}
-	size = 128;
+	size = 512;
 	default_action = drop;
     }
 
@@ -500,10 +503,11 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    meta_epoch : exact;
 	    calendar_slot : exact;
 	}
-	size = 2048;
+	size = 8192;
 	default_action = drop;
     }
     
@@ -538,10 +542,11 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 1024;
+	size = 4096;
 	default_action = drop;
     }
 
