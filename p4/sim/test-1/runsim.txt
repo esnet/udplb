@@ -8,13 +8,13 @@
 #
 
 # Unicast
-table_add mac_dst_filter_table set_mac_sa 0x00aabbccddee => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x00aabbccddee => 0x00aabbccddee 0
 
 # Broadcast
-table_add mac_dst_filter_table set_mac_sa 0xffffffffffff => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0xffffffffffff => 0x00aabbccddee 0
 
 # IPv6 All Nodes Link-Local Multicast
-table_add mac_dst_filter_table set_mac_sa 0x333300000001 => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x333300000001 => 0x00aabbccddee 0
 
 ##########################################################################
 # Load Balancer Instance #0
@@ -26,24 +26,24 @@ table_add mac_dst_filter_table set_mac_sa 0x333300000001 => 0x00aabbccddee
 # MAC DST FILTER
 #
 # IPv6 Solicited Node Multicast Address
-table_add mac_dst_filter_table set_mac_sa 0x3333ffccddee => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x3333ffccddee => 0x00aabbccddee 0
 
 #
 # IP DST FILTER
 #
 
 # IPv4 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x0800 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0800 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0 0
 # ARP Target Protocol Address
-table_add ip_dst_filter_table set_ip_sa 0x0806 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0806 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0 0
 # IPv6 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xfd9f53b7a26148ed02aabbfffeccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xfd9f53b7a26148ed02aabbfffeccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
 # IPv6 Solicited Node Multicast Address
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff0200000000000000000001ffccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff0200000000000000000001ffccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
 
 # IPv6 All Nodes Link-Local Multicast
 # NOTE: Only 1 of the lb_ids can respond to the all nodes link-local multicast IP
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee 0
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
 
 # Load balancer config
 table_add epoch_assign_table do_assign_epoch 0 0x0000000000000000/0 => 0x00000000 63
@@ -62,20 +62,20 @@ table_add member_info_lookup_table do_ipv6_member_rewrite 0 0x86dd 0x0000 => 0x1
 # MAC DST FILTER
 #
 # IPv6 Solicited Node Multicast Address
-table_add mac_dst_filter_table set_mac_sa 0x3333ff000001 => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x3333ff000001 => 0x00aabbccddee 0
 
 #
 # IP DST FILTER
 #
 
 # IPv4 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x0800 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0800 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1 0
 # ARP Target Protocol Address
-table_add ip_dst_filter_table set_ip_sa 0x0806 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0806 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1 0
 # IPv6 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xfd9f53b7a26148ed0000000000000001 => 0xfd9f53b7a26148ed0000000000000001 1
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xfd9f53b7a26148ed0000000000000001 => 0xfd9f53b7a26148ed0000000000000001 1 0
 # IPv6 Solicited Node Multicast Address
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff0200000000000000000001ff000001 => 0xfd9f53b7a26148ed0000000000000001 1
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff0200000000000000000001ff000001 => 0xfd9f53b7a26148ed0000000000000001 1 0
 
 # Load balancer config
 table_add epoch_assign_table do_assign_epoch 1 0x0000000000000000/0 => 0x00000000 63

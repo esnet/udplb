@@ -434,6 +434,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_mac_sa;
 	}
 	key = {
+	    pmeta.dest_port : field_mask;
 	    hdr.ethernet.dstAddr : exact;
 	}
 	size = 64;
@@ -455,6 +456,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_ip_sa;
 	}
 	key = {
+	    pmeta.dest_port : field_mask;
 	    hdr.ethernet.etherType : exact;
 	    meta_ip_da : exact;
 	}
