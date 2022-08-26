@@ -55,6 +55,7 @@ sim:
   timeout: 2h
   needs:
     - p4bm
+  allow_failure: true
 
 build_bitfile:
   stage: bitfile
