@@ -55,6 +55,7 @@ sim:
   timeout: 2h
   needs:
     - p4bm
+  allow_failure: true
 
 build_bitfile:
   stage: bitfile
@@ -84,7 +85,7 @@ build_bitfile:
       when: manual
       allow_failure: true
 
-export_hwapi:
+.hwapi:
   stage: package
   extends: .common
   tags:
@@ -92,31 +93,50 @@ export_hwapi:
   before_script: []
   script:
     - unzip artifacts/open-nic-ci/artifacts.esnet-smartnic-hw.export_hwapi.0.zip
+    - |
+      cat <<_EOF >> hwapi.env
+      SN_HW_HWAPI_JOB_NUMBER=$CI_JOB_ID
+      _EOF
+    - cat hwapi.env
   artifacts:
-    name: "artifacts.udplb.$CI_PIPELINE_ID"
+    name: "artifacts.$SN_HW_APP_NAME.$CI_PIPELINE_ID"
     paths:
       - esnet-smartnic-hwapi
     when: always
     expire_in: 3 month
+    reports:
+      dotenv:
+        hwapi.env
   timeout: 30m
+
+export_hwapi:
+  extends: .hwapi
+  variables:
+    SN_HW_APP_NAME: udplb
   needs:
     - build_bitfile
+
+.trigger_fw:
+  stage: trigger_downstream
+  variables:
+    SN_HW_GROUP: $CI_PROJECT_NAMESPACE
+    SN_HW_REPO: $CI_PROJECT_NAME
+    SN_HW_BRANCH: $CI_COMMIT_BRANCH
+    # override the artifact URL in the triggered repo so it pulls directly from the hwapi job from this pipeline
+    ESNET_SMARTNIC_HWAPI_URL: "$CI_PROJECT_URL/-/jobs/$SN_HW_HWAPI_JOB_NUMBER/artifacts/download?file_type=archive"
+  trigger:
+    project: ht/esnet-smartnic-fw
+    branch: main
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
       when: manual
       allow_failure: true
 
-trigger_downstream_job:
-  stage: trigger_downstream
+fw_udplb:
+  extends: .trigger_fw
   variables:
-    SN_HW_GROUP: ht
-    SN_HW_REPO: udplb
-    SN_HW_BRANCH: main
-    SN_HW_API_JOB: export_hwapi
     SN_HW_APP_NAME: udplb
-  trigger:
-    project: ht/esnet-smartnic-fw
-    branch: main
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    SN_HW_API_JOB: export_hwapi
+  needs:
+    - export_hwapi

@@ -1,44 +1,88 @@
 # Simulated configuration
 #   LB unicast MAC : 00:aa:bb:cc:dd:ee
 #   LB IPv4 Net    : 10.1.2.0/24
-#   LB unicast IPv4: 10.1.2.3
 #   LB IPv6 ULA Net: fd9f:53b7:a261:48ed/64
+
+#
+# MAC DST FILTER (common)
+#
+
+# Unicast
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x00aabbccddee => 0x00aabbccddee 0
+
+# Broadcast
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0xffffffffffff => 0x00aabbccddee 0
+
+# IPv6 All Nodes Link-Local Multicast
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x333300000001 => 0x00aabbccddee 0
+
+##########################################################################
+# Load Balancer Instance #0
+#   LB unicast IPv4: 10.1.2.3
 #   LB unicast IPv6: fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee/128
+#
 
 #
 # MAC DST FILTER
 #
-
-# Unicast
-table_add mac_dst_filter_table set_mac_sa 0x00aabbccddee => 0x00aabbccddee
 # IPv6 Solicited Node Multicast Address
-table_add mac_dst_filter_table set_mac_sa 0x3333ffccddee => 0x00aabbccddee
-# Broadcast
-table_add mac_dst_filter_table set_mac_sa 0xffffffffffff => 0x00aabbccddee
-# IPv6 All Nodes Link-Local Multicast
-table_add mac_dst_filter_table set_mac_sa 0x333300000002 => 0x00aabbccddee
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x3333ffccddee => 0x00aabbccddee 0
 
 #
 # IP DST FILTER
 #
 
 # IPv4 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x0800 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0800 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0 0
 # ARP Target Protocol Address
-table_add ip_dst_filter_table set_ip_sa 0x0806 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0806 0x0000000000000000000000000a010203 => 0x0000000000000000000000000a010203 0 0
 # IPv6 Unicast
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xfd9f53b7a26148ed02aabbfffeccddee => 0xfd9f53b7a26148ed02aabbfffeccddee
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xfd9f53b7a26148ed02aabbfffeccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
 # IPv6 Solicited Node Multicast Address
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff0200000000000000000001ffccddee => 0xfd9f53b7a26148ed02aabbfffeccddee
-# IPv6 All Nodes Link-Local Multicast
-table_add ip_dst_filter_table set_ip_sa 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff0200000000000000000001ffccddee => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
 
-table_add epoch_assign_table do_assign_epoch 0x0000000000000000/0 => 0x00000000 63
-table_add epoch_assign_table do_assign_epoch 0x0000000000000010/60 => 0x00000001 5
-table_add load_balance_calendar_table do_assign_member 0x00000000 0x00a => 0x0000
-table_add load_balance_calendar_table do_assign_member 0x00000001 0x014 => 0x0000
-table_add member_info_lookup_table do_ipv4_member_rewrite 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4
-table_add member_info_lookup_table do_ipv6_member_rewrite 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4
+# IPv6 All Nodes Link-Local Multicast
+# NOTE: Only 1 of the lb_ids can respond to the all nodes link-local multicast IP
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff020000000000000000000000000001 => 0xfd9f53b7a26148ed02aabbfffeccddee 0 0
+
+# Load balancer config
+table_add epoch_assign_table do_assign_epoch 0 0x0000000000000000/0 => 0x00000000 63
+table_add epoch_assign_table do_assign_epoch 0 0x0000000000000010/60 => 0x00000001 5
+table_add load_balance_calendar_table do_assign_member 0 0x00000000 0x00a => 0x0000
+table_add load_balance_calendar_table do_assign_member 0 0x00000001 0x014 => 0x0000
+table_add member_info_lookup_table do_ipv4_member_rewrite 0 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4
+table_add member_info_lookup_table do_ipv6_member_rewrite 0 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4
+
+##########################################################################
+# Load Balancer Instance #1
+#   LB unicast IPv4: 10.1.2.4
+#   LB unicast IPv6: fd9f:53b7:a261:48ed::1/128
+
+#
+# MAC DST FILTER
+#
+# IPv6 Solicited Node Multicast Address
+table_add mac_dst_filter_table set_mac_sa 0&&&0 0x3333ff000001 => 0x00aabbccddee 0
+
+#
+# IP DST FILTER
+#
+
+# IPv4 Unicast
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0800 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1 0
+# ARP Target Protocol Address
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x0806 0x0000000000000000000000000a010204 => 0x0000000000000000000000000a010204 1 0
+# IPv6 Unicast
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xfd9f53b7a26148ed0000000000000001 => 0xfd9f53b7a26148ed0000000000000001 1 0
+# IPv6 Solicited Node Multicast Address
+table_add ip_dst_filter_table set_ip_sa 0&&&0 0x86dd 0xff0200000000000000000001ff000001 => 0xfd9f53b7a26148ed0000000000000001 1 0
+
+# Load balancer config
+table_add epoch_assign_table do_assign_epoch 1 0x0000000000000000/0 => 0x00000000 63
+table_add epoch_assign_table do_assign_epoch 1 0x0000000000000010/60 => 0x00000001 5
+table_add load_balance_calendar_table do_assign_member 1 0x00000000 0x00a => 0x0000
+table_add load_balance_calendar_table do_assign_member 1 0x00000001 0x014 => 0x0000
+table_add member_info_lookup_table do_ipv4_member_rewrite 1 0x0800 0x0000 => 0x998877665544 0x0a0b0c0d 0x1112 2
+table_add member_info_lookup_table do_ipv6_member_rewrite 1 0x86dd 0x0000 => 0x998877665544 0xfe80aa00000000000000000000000004 0x1111 2
 
 run_traffic packets
-

@@ -418,6 +418,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     bit<128> meta_ip_da = 0;
     bit<48>  meta_mac_sa = 0;
     bit<128> meta_ip_sa = 0;
+    bit<2>   meta_lb_id = 0;
 
     action drop() {
 	smeta.drop = 1;
@@ -433,6 +434,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_mac_sa;
 	}
 	key = {
+	    pmeta.dest_port : field_mask;
 	    hdr.ethernet.dstAddr : exact;
 	}
 	size = 64;
@@ -443,8 +445,9 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     // IPDstFilter
     //
 
-    action set_ip_sa(bit<128> ip_sa) {
+    action set_ip_sa(bit<128> ip_sa, bit<2> lb_id) {
 	meta_ip_sa = ip_sa;
+	meta_lb_id = lb_id;
     }
 
     table ip_dst_filter_table {
@@ -453,6 +456,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_ip_sa;
 	}
 	key = {
+	    pmeta.dest_port : field_mask;
 	    hdr.ethernet.etherType : exact;
 	    meta_ip_da : exact;
 	}
@@ -476,9 +480,10 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    hdr.udplb.tick : lpm;
 	}
-	size = 128;
+	size = 512;
 	default_action = drop;
     }
 
@@ -500,10 +505,11 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    meta_epoch : exact;
 	    calendar_slot : exact;
 	}
-	size = 2048;
+	size = 8192;
 	default_action = drop;
     }
     
@@ -538,10 +544,11 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    drop;
 	}
 	key = {
+	    meta_lb_id : exact;
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 1024;
+	size = 4096;
 	default_action = drop;
     }
 
@@ -766,6 +773,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
 	    bit<48>  new_mac_da;
+	    bit<1>   solicited;
 
 	    // Make sure this is an ND solicitation for our unicast IPv6 address
 	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
@@ -775,11 +783,12 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 
 	    // Figure out what our destination addresses should be based on the type of query we've received
 	    if (hdr.ipv6.srcAddr == 128w0) {
-		// Source is the unspecified address so reply to the all-nodes multicast IP
+		// Source is the unspecified address so reply to the all-nodes multicast IP and clear solicited flag
 		new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
 		new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
+		solicited = 0;
 	    } else {
-		// Reply to the originating source IP
+		// Reply to the originating source IP and set the solicited flag
 		new_ip_da = hdr.ipv6.srcAddr;
 
 		if (hdr.ipv6nd_option_lladdr.isValid()) {
@@ -789,6 +798,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 		    // No link-layer address option, reply to the unicast MAC from the original frame
 		    new_mac_da = hdr.ethernet.srcAddr;
 		}
+		solicited = 1;
 	    }
 
 	    // Update our ethernet header addresses
@@ -814,7 +824,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    // Fill out our ND advertisement
 	    hdr.ipv6nd_neigh_adv.setValid();
 	    hdr.ipv6nd_neigh_adv.router_flag    = 0;
-	    hdr.ipv6nd_neigh_adv.solicited_flag = 1;
+	    hdr.ipv6nd_neigh_adv.solicited_flag = solicited;
 	    hdr.ipv6nd_neigh_adv.override_flag  = 0;
 	    hdr.ipv6nd_neigh_adv.rsvd           = 0;
 	    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
