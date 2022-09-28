@@ -13,13 +13,17 @@
 #define INCLUDE_IPV6ND 1
 #define INCLUDE_ARP 1
 
-struct platform_metadata {
-    bit<64> ingress_global_timestamp;
-    bit<2>  dest_port;
-    bit<1>  truncate_enable;
-    bit<16> packet_length;
-    bit<1>  rss_override_enable;
-    bit<8>  rss_override;
+struct smartnic_metadata {
+    bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
+    bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
+    bit<3>  ingress_port;    // 3b ingress port (0:CMAC0, 1:CMAC1, 2:HOST0, 3:HOST1).
+    bit<3>  egress_port;     // 3b egress port  (0:CMAC0, 1:CMAC1, 2:HOST0, 3:HOST1).
+    bit<1>  truncate_enable; // reserved (tied to 0).
+    bit<16> truncate_length; // reserved (tied to 0).
+    bit<1>  rss_enable;      // reserved (tied to 0).
+    bit<12> rss_entropy;     // reserved (tied to 0).
+    bit<4>  drop_reason;     // reserved (tied to 0).
+    bit<32> scratch;         // reserved (tied to 0).
 }
 
 header ethernet_t {
@@ -285,7 +289,7 @@ cksum_sub_bit128(cksum, old); \
 cksum_add_bit128(cksum, new);
 #endif // CKSUM_MODE
 
-parser ParserImpl(packet_in packet, out headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
+parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
     state start {
         transition parse_ethernet;
     }
@@ -409,7 +413,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout platform_metadata pme
     }
 }
 
-control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
+control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
 
     //
     // MacDstFilter
@@ -434,7 +438,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_mac_sa;
 	}
 	key = {
-	    pmeta.dest_port : field_mask;
+	    snmeta.egress_port : field_mask;
 	    hdr.ethernet.dstAddr : exact;
 	}
 	size = 64;
@@ -456,7 +460,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
 	    set_ip_sa;
 	}
 	key = {
-	    pmeta.dest_port : field_mask;
+	    snmeta.egress_port : field_mask;
 	    hdr.ethernet.etherType : exact;
 	    meta_ip_da : exact;
 	}
@@ -963,7 +967,7 @@ control MatchActionImpl(inout headers hdr, inout platform_metadata pmeta, inout 
     }
 }
 
-control DeparserImpl(packet_out packet, in headers hdr, inout platform_metadata pmeta, inout standard_metadata_t smeta) {
+control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
 #if INCLUDE_ARP
