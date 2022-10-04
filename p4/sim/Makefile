@@ -32,8 +32,9 @@ P4BM_OUTPUTS        = $(P4BM_LOGFILE_PREFIX)_cli.txt $(P4BM_LOGFILE_PREFIX)_mode
                       $(P4BM_OUTPUT_META) $(P4BM_OUTPUT_PCAP)
 
 # Executable pathnames (particularly if they're not in $PATH)
-P4C_SDNET      = p4c-vitisnet
-RUN_P4BM_SDNET = run-p4bm-vitisnet
+P4C_VITISNET = p4c-vitisnet
+RUN_P4BM_VITISNET = run-p4bm-vitisnet
+RUN_P4BM_OPTIONS  = -d
 
 # ---------------------------------------------------------------------------
 # Targets
@@ -45,7 +46,7 @@ sim: build
 # Make sure that $(P4BM_DIR)/$(P4BM_SCRIPT) exists (avoids issues if script is missing).
 	(cd $(P4BM_DIR) && wc $(P4BM_SCRIPT) > /dev/null)
 	[ ! -x $(P4BM_DIR)/pcap-generator.py ] || (cd $(P4BM_DIR) && ./pcap-generator.py)
-	(cd $(P4BM_DIR) && $(RUN_P4BM_SDNET) -l $(P4BM_LOGFILE_PREFIX) --json $(P4_OBJECT_TEST) -s $(P4BM_SCRIPT))
+	(cd $(P4BM_DIR) && $(RUN_P4BM_VITISNET) $(RUN_P4BM_OPTIONS) -l $(P4BM_LOGFILE_PREFIX) --json $(P4_OBJECT_TEST) -s $(P4BM_SCRIPT))
 
 build: $(P4_OBJECT)
 
@@ -60,5 +61,5 @@ clean: cleansim-all
 	rm -f $(P4_OBJECT)
 
 %.json: %.p4
-	$(P4C_SDNET) $< -o $@
+	$(P4C_VITISNET) $< -o $@
 
