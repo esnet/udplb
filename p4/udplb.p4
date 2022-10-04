@@ -438,7 +438,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    set_mac_sa;
 	}
 	key = {
-	    snmeta.egress_port : field_mask;
+	    snmeta.ingress_port : field_mask;
 	    hdr.ethernet.dstAddr : exact;
 	}
 	size = 64;
@@ -460,7 +460,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    set_ip_sa;
 	}
 	key = {
-	    snmeta.egress_port : field_mask;
+	    snmeta.ingress_port : field_mask;
 	    hdr.ethernet.etherType : exact;
 	    meta_ip_da : exact;
 	}
