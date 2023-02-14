@@ -27,7 +27,7 @@ module udplb_ctrl_unit_test;
     //===================================
     // Import common testcase tasks
     //===================================
-    `include "../../../esnet-smartnic-hw/src/p4_app/tests/common/tasks.svh"
+    `include "../../esnet-smartnic-hw/src/p4_app/tests/common/tasks.svh"
 
     //===================================
     // Build
