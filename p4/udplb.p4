@@ -62,8 +62,7 @@ header ipv6_t {
 #if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 
 header icmpv6_common_t {
-    bit<8>   msg_type;
-    bit<8>   code;
+    bit<16>  msg_type_code;
     bit<16>  checksum;
 }
 
@@ -133,8 +132,7 @@ header ipv4_opt_t {
 
 #if INCLUDE_ICMPV4ECHO
 header icmpv4_common_t {
-    bit<8>  msg_type;
-    bit<8>  code;
+    bit<16> msg_type_code;
     bit<16> checksum;
 }
 
@@ -201,12 +199,6 @@ error {
     UnhandledArpPLen,
     UnhandledArpOper,
 #endif // INCLUDE_ARP
-#if INCLUDE_ICMPV4ECHO
-    InvalidICMPv4EchoCode,
-#endif  // INCLUDE_ICMPV4ECHO
-#if INCLUDE_ICMPV6ECHO
-    InvalidICMPv6EchoCode,
-#endif  // INCLUDE_ICMPV6ECHO
     InvalidIPpacket,
     InvalidUDPLBmagic,
     InvalidUDPLBversion
@@ -341,12 +333,12 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 #if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
-	transition select(hdr.icmpv6_common.msg_type) {
+	transition select(hdr.icmpv6_common.msg_type_code) {
 #if INCLUDE_ICMPV6ECHO
-	    8w128: parse_icmpv6_echo;
+	    8w128 ++ 8w0: parse_icmpv6_echo;
 #endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
-	    8w135: parse_ipv6nd_neigh_sol;
+	    8w135 ++ 8w0: parse_ipv6nd_neigh_sol;
 #endif  // INCLUDE_IPV6NS
 	}
     }
@@ -354,7 +346,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 
 #if INCLUDE_ICMPV6ECHO
     state parse_icmpv6_echo {
-	verify(hdr.icmpv6_common.code == 0, error.InvalidICMPv6EchoCode);
 	packet.extract(hdr.icmpv6_echo);
 	transition accept;
     }
@@ -386,13 +377,12 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 #if INCLUDE_ICMPV4ECHO
     state parse_icmpv4 {
 	packet.extract(hdr.icmpv4_common);
-	transition select(hdr.icmpv4_common.msg_type) {
-	    8w8: parse_icmpv4_echo;
+	transition select(hdr.icmpv4_common.msg_type_code) {
+	    8w8 ++ 8w0: parse_icmpv4_echo;
 	}
     }
 
     state parse_icmpv4_echo {
-	verify(hdr.icmpv4_common.code == 0, error.InvalidICMPv4EchoCode);
 	packet.extract(hdr.icmpv4_echo);
 	transition accept;
     }
@@ -735,10 +725,9 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
 
 	    // Change the type to be a reply, fixing up the header checksum
-	    cksum_sub_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
-	    hdr.icmpv4_common.msg_type = 0;   // Echo Reply
-	    hdr.icmpv4_common.code = 0;
-	    cksum_add_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type ++ hdr.icmpv4_common.code);
+	    cksum_sub_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type_code);
+	    hdr.icmpv4_common.msg_type_code = 8w0 ++ 8w0;   // Echo Reply
+	    cksum_add_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv4_common.checksum, v4echo_ckd);
 
 	    return;
@@ -765,10 +754,9 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    }
 
             // Change the type to be a reply, fixing up the header checksum
-	    cksum_sub_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
-	    hdr.icmpv6_common.msg_type = 129;   // Echo Reply
-	    hdr.icmpv6_common.code = 0;
-	    cksum_add_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    cksum_sub_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type_code);
+	    hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
+	    cksum_add_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6echo_ckd);
 
 	    return;
@@ -821,8 +809,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Fill out the ICMPv6 common header
 	    hdr.icmpv6_common.setValid();
-	    hdr.icmpv6_common.msg_type = 136;   // ND Advertisement
-	    hdr.icmpv6_common.code     = 0;
+	    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
 	    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
 
 	    // Fill out our ND advertisement
@@ -853,7 +840,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_add_bit16(v6nd2_ckd, hdr.ipv6.payloadLen);
 	    cksum_add_bit16(v6nd2_ckd, 8w0 ++ hdr.ipv6.nextHdr);
 
-	    cksum_add_bit16(v6nd2_ckd, hdr.icmpv6_common.msg_type ++ hdr.icmpv6_common.code);
+	    cksum_add_bit16(v6nd2_ckd, hdr.icmpv6_common.msg_type_code);
 
 	    cksum_add_bit16(v6nd2_ckd, hdr.ipv6nd_neigh_adv.router_flag ++ hdr.ipv6nd_neigh_adv.solicited_flag ++ hdr.ipv6nd_neigh_adv.override_flag ++ hdr.ipv6nd_neigh_adv.rsvd[28:16]);
 	    bit<16> v6nd3_ckd = v6nd2_ckd;
