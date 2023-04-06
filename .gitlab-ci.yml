@@ -59,10 +59,17 @@ sim:
 build_bitfile:
   stage: bitfile
   extends: .common
+  variables:
+    SN_HW_BOARD: au280
   tags:
     - ht-synth
   script:
-    - make build BUILD_NAME=open-nic-ci
+    - |
+      cat <<_EOF >> bitfile.env
+      SN_HW_BOARD=$SN_HW_BOARD
+      _EOF
+      cat bitfile.env
+      make build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
@@ -76,6 +83,9 @@ build_bitfile:
       - .gitmodules
     when: always
     expire_in: 2 weeks
+    reports:
+      dotenv:
+        bitfile.env
   timeout: 9h
   needs: []
   rules:
@@ -91,10 +101,12 @@ build_bitfile:
     - ht-misc
   before_script: []
   script:
-    - unzip artifacts/open-nic-ci/artifacts.esnet-smartnic-hw.export_hwapi.0.zip
+    - unzip artifacts/open-nic-ci/artifacts.$SN_HW_BOARD.open-nic-ci.0.zip
     - |
       cat <<_EOF >> hwapi.env
       SN_HW_HWAPI_JOB_NUMBER=$CI_JOB_ID
+      SN_HW_APP_NAME=$SN_HW_APP_NAME
+      SN_HW_BOARD=$SN_HW_BOARD
       _EOF
     - cat hwapi.env
   artifacts:
@@ -121,6 +133,8 @@ export_hwapi:
     SN_HW_GROUP: $CI_PROJECT_NAMESPACE
     SN_HW_REPO: $CI_PROJECT_NAME
     SN_HW_BRANCH: $CI_COMMIT_BRANCH
+    SN_HW_APP_NAME: $SN_HW_APP_NAME
+    SN_HW_BOARD: $SN_HW_BOARD
     # override the artifact URL in the triggered repo so it pulls directly from the hwapi job from this pipeline
     ESNET_SMARTNIC_HWAPI_URL: "$CI_PROJECT_URL/-/jobs/$SN_HW_HWAPI_JOB_NUMBER/artifacts/download?file_type=archive"
   trigger:
@@ -135,7 +149,6 @@ export_hwapi:
 fw_udplb:
   extends: .trigger_fw
   variables:
-    SN_HW_APP_NAME: udplb
     SN_HW_API_JOB: export_hwapi
   needs:
     - export_hwapi
