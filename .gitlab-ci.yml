@@ -110,7 +110,7 @@ build_bitfile:
       _EOF
     - cat hwapi.env
   artifacts:
-    name: "artifacts.$SN_HW_APP_NAME.$CI_PIPELINE_ID"
+    name: "artifacts.$SN_HW_BOARD.$SN_HW_APP_NAME.$CI_PIPELINE_ID"
     paths:
       - esnet-smartnic-hwapi
     when: always
