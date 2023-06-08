@@ -1,4 +1,50 @@
 *~
-artifacts/
-.app_config.mk
+\#*\#
 
+# Xilinx             #
+######################
+*.backup.jou
+*.backup.log
+vivado*.jou
+vivado*.log
+vivado_*.str
+hs_err_pid*.log
+webtalk*.log
+webtalk*.jou
+
+# Simulations
+xvlog*.*
+xelab*.*
+xsim*.*
+*.wdb
+
+artifacts/
+
+# Precompiled libraries
+*.sdb
+*.rlx
+
+# Simulation
+**/lib/sub.libs
+**/lib/compile*.log
+**/lib/compile*.sh
+**/run_[0-9]*/
+.sim_waves.tcl
+**/tests*/*/*.wcfg
+
+# VitisNetP4
+*thrift.log
+
+# Synthesis
+*.dcp
+*.rpt
+
+**/.Xil
+
+# SVUnit             #
+######################
+**/.svunit
+
+# Output dirs        #
+######################
+**/.app
