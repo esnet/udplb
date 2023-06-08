@@ -12,9 +12,8 @@ variables:
   GIT_STRATEGY: clone
 
 .common:
-  image: $CI_REGISTRY/ht/xilinx-tools-docker:26009-g26ccc4b6
+  image: $CI_REGISTRY/ht/xilinx-tools-docker:36639-g97523045
   before_script:
-    - source /opt/Xilinx/Vivado/2022.1/settings64.sh
   variables:
     XILINXD_LICENSE_FILE: "2100@dmv.es.net"
     # Required to keep click python module happy
