@@ -17,7 +17,7 @@ The awkward concatenaton of the two dissectors is to fix the non-deterministic o
 # Set up the vivado tools environment
 
 ```
-source /tools/Xilinx/Vivado/2023.1/settings64.sh
+source /tools/Xilinx/Vivado/2023.2/settings64.sh
 ```
 
 # Simulate the P4 pipeline
