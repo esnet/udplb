@@ -68,6 +68,7 @@ build_bitfile:
       SN_HW_BOARD=$SN_HW_BOARD
       _EOF
       cat bitfile.env
+      make config
       make build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
