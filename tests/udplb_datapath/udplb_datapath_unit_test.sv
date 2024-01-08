@@ -61,7 +61,8 @@ module udplb_datapath_unit_test;
         svunit_ut.setup();
 
         // Flush packets from pipeline
-        env.axis_monitor.flush();
+        env.axis_monitor[0].flush();
+        env.axis_monitor[1].flush();
 
         // Issue reset (both datapath and management domains)
         reset();
@@ -70,8 +71,10 @@ module udplb_datapath_unit_test;
         vitisnetp4_agent.init();
 
         // Put AXI-S interfaces into quiescent state
-        env.axis_driver.idle();
-        env.axis_monitor.idle();
+        env.axis_driver[0].idle();
+        env.axis_driver[1].idle();
+        env.axis_monitor[0].idle();
+        env.axis_monitor[1].idle();
 
     endtask
 
@@ -88,7 +91,8 @@ module udplb_datapath_unit_test;
         svunit_ut.teardown();
 
         // Flush remaining packets
-        env.axis_monitor.flush();
+        env.axis_monitor[0].flush();
+        env.axis_monitor[1].flush();
         #10us;
 
         // Clean up SDNet tables
@@ -168,13 +172,13 @@ module udplb_datapath_unit_test;
          fork
              begin
                  // Send packets
-                 send_pcap(filename, num_pkts, start_idx);
+                 send_pcap(filename, num_pkts, start_idx, 0, 0, 0, dest_port); // twait=0, in_if=0, id=0.
              end
              begin
                  // If init_timestamp=1, increment timestamp after each tx packet (puts packet # in timestamp field)
                  while ( (init_timestamp == 1) && !rx_done ) begin
-                    @(posedge tb.axis_in_if.tlast or posedge rx_done) begin
-                       if (tb.axis_in_if.tlast) begin timestamp++; env.ts_agent.set_static(timestamp); end
+                    @(posedge tb.axis_in_if[0].tlast or posedge rx_done) begin
+                       if (tb.axis_in_if[0].tlast) begin timestamp++; env.ts_agent.set_static(timestamp); end
                     end
                  end
              end
@@ -189,7 +193,7 @@ module udplb_datapath_unit_test;
                          end
                          begin
                              // Monitor received packets
-                             env.axis_monitor.receive_raw(.data(rx_data), .id(id), .dest(dest), .user(user), .tpause(0));
+                             env.axis_monitor[0].receive_raw(.data(rx_data), .id(id), .dest(dest), .user(user), .tpause(0));
                              rx_pkt_cnt++;
                              debug_msg( $sformatf( "      Receiving packet # %0d (of %0d)...",
                                                   rx_pkt_cnt, exp_pcap_record_hdr.size()), VERBOSE );
