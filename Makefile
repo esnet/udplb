@@ -32,6 +32,7 @@ build:
 
 config:
 	@$(MAKE) -s -C $(SMARTNIC_DIR) config APP_DIR=$(CURDIR)
+	@-cp protocols/*.lua $(CURDIR)/.app/src/p4_app/app_if/
 
 clean:
 	@$(MAKE) -s -C $(SMARTNIC_DIR) clean_build APP_DIR=$(CURDIR)
