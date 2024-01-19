@@ -60,6 +60,7 @@ build_bitfile:
   extends: .common
   variables:
     SN_HW_BOARD: au280
+    IMPL_STRATEGY: Performance_ExplorePostRoutePhysOpt
   tags:
     - ht-synth
   script:
