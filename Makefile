@@ -24,7 +24,9 @@ SMARTNIC_DIR := $(CURDIR)/esnet-smartnic-hw
 # Supports 'au280' and 'au55c'.  Default is 'au280'.
 #export BOARD := au55c
 
+# Build options
 export max_pkt_len = 9100
+export IMPL_STRATEGY ?= "Performance_ExplorePostRoutePhysOpt"
 
 #------- Targets -------
 build:

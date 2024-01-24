@@ -4,16 +4,24 @@ include:
 stages:
   - p4_sim
   - rtl_sim
+  - app
+  - ip
   - bitfile
+  - validate
   - package
   - trigger_downstream
 
 variables:
   GIT_STRATEGY: clone
+  SEED: 0
+  RANDOMIZE_SEED: 0
+  SN_HW_APP_NAME: udplb
 
 .common:
   image: $CI_REGISTRY/ht/xilinx-tools-docker:43194-gd5ce900f
   before_script:
+    - if [ $RANDOMIZE_SEED -gt 0 ]; then export SEED=$RANDOM; fi
+    - echo "Running pipeline with SEED $SEED..."
   variables:
     XILINXD_LICENSE_FILE: "2100@dmv.es.net"
     # Required to keep click python module happy
@@ -37,29 +45,167 @@ p4bm:
       - p4/sim
   needs: []
 
-sim:
+sim_app_tests:
   stage: rtl_sim
   extends: .common
   tags:
     - ht-sim
   script:
     - make -C tests/regression
-    - grep 'PASSED.*suites passing' tests/regression/run_0/sim.log
+    - grep 'PASSED.*suites passing' tests/regression/run_$SEED/sim.log
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     reports:
       junit:
-        - tests/regression/run_0/tests.xml
+        - tests/regression/run_*/tests.xml
     when: always
   timeout: 2h
   needs:
     - p4bm
 
-build_bitfile:
-  stage: bitfile
+app_cache_key:
+  stage: app
   extends: .common
+  tags:
+    - ht-sim
+  script:
+    - |
+      cat <<_EOF | tee dependencies.txt
+      VIVADO_VERSION=$VIVADO_VERSION
+      _EOF
+    - |
+      cat <<_EOF | tee cache_key.env
+      SMARTNIC_IP_CACHE_KEY=$(sha1sum dependencies.txt | awk '{ print $1 }')
+      _EOF
+  artifacts:
+    reports:
+      dotenv:
+        cache_key.env
+  needs: []
+
+.app:
+  stage: app
+  extends: .common
+  tags:
+    - ht-synth
+  script:
+    - make -s config BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+    - make -s -C .app/src/p4_app/app_if build  BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+    paths:
+      - esnet-smartnic-hw/src/p4_app/app_if
+      - .app
+    when: always
+    expire_in: 1 week
+  cache:
+    - key: cache-app-$CI_COMMIT_REF_SLUG-$SN_HW_BOARD-$APP_CACHE_KEY
+      fallback_keys:
+        - cache-app-$CI_DEFAULT_BRANCH-$SN_HW_BOARD-$APP_CACHE_KEY
+      paths:
+        - esnet-smartnic-hw/src/p4_app/app_if
+        - .app
+  timeout: 4h
+  needs:
+    - app_cache_key
+
+app_au280:
+  extends: .app
   variables:
     SN_HW_BOARD: au280
+
+ons_ip_cache_key:
+  stage: ip
+  extends: .common
+  tags:
+    - ht-sim
+  script:
+    - |
+      cat <<_EOF | tee dependencies.txt
+      VIVADO_VERSION=$VIVADO_VERSION
+      $(git -C esnet-smartnic-hw submodule status open-nic-shell | awk '{ print $1,$2 }')
+      _EOF
+    - |
+      cat <<_EOF | tee cache_key.env
+      ONS_IP_CACHE_KEY=$(sha1sum dependencies.txt | awk '{ print $1 }')
+      _EOF
+  artifacts:
+    reports:
+      dotenv:
+        cache_key.env
+  needs: []
+
+.ons_ip:
+  stage: ip
+  extends: .common
+  tags:
+    - ht-synth
+  script:
+    - make -C esnet-smartnic-hw -f makefile.esnet project_ip BOARD=$SN_HW_BOARD
+  artifacts:
+    paths:
+      - esnet-smartnic-hw/open-nic-shell/build
+  cache:
+    - key: cache-ons_ip-$SN_HW_BOARD-$ONS_IP_CACHE_KEY
+      paths:
+        - esnet-smartnic-hw/open-nic-shell/build
+  timeout: 4h
+  needs:
+    - ons_ip_cache_key
+
+ons_ip_au280:
+  extends: .ons_ip
+  variables:
+    SN_HW_BOARD: au280
+
+smartnic_ip_cache_key:
+  stage: ip
+  extends: .common
+  tags:
+    - ht-sim
+  script:
+    - |
+      cat <<_EOF | tee dependencies.txt
+      VIVADO_VERSION=$VIVADO_VERSION
+      $(git submodule status --recursive -- esnet-smartnic-hw | awk '{ print $1,$2 }')
+      _EOF
+    - |
+      cat <<_EOF | tee cache_key.env
+      SMARTNIC_IP_CACHE_KEY=$(sha1sum dependencies.txt | awk '{ print $1 }')
+      _EOF
+  artifacts:
+    reports:
+      dotenv:
+        cache_key.env
+  needs: []
+
+.smartnic_ip:
+  stage: ip
+  extends: .common
+  tags:
+    - ht-synth
+  script:
+    - make -C esnet-smartnic-hw/src/smartnic_250mhz/build ip BOARD=$SN_HW_BOARD
+    - make -C esnet-smartnic-hw/src/smartnic_322mhz/build ip BOARD=$SN_HW_BOARD
+  artifacts:
+    paths:
+      - esnet-smartnic-hw/.out
+  cache:
+    - key: cache-smartnic_ip-$SN_HW_BOARD-$SMARTNIC_IP_CACHE_KEY
+      paths:
+        - esnet-smartnic-hw/.out
+  timeout: 4h
+  needs:
+    - smartnic_ip_cache_key
+
+smartnic_ip_au280:
+  extends: .smartnic_ip
+  variables:
+    SN_HW_BOARD: au280
+
+.bitfile:
+  stage: bitfile
+  extends: .common
   tags:
     - ht-synth
   script:
@@ -67,31 +213,61 @@ build_bitfile:
       cat <<_EOF >> bitfile.env
       SN_HW_BOARD=$SN_HW_BOARD
       _EOF
-      cat bitfile.env
-      make config
-      make build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+    - cat bitfile.env
+    - find .app -exec touch {} \; 2>/dev/null && echo "Using existing application output products." || echo "No existing application output products available."
+    - (find esnet-smartnic-hw/.out -exec touch {} \; 2>/dev/null && rm -rf .app/out/smartnic && mv esnet-smartnic-hw/.out .app/out/smartnic 2>/dev/null) && echo "Using pre-generated IP." || echo "No pre-generated IP available."
+    - make -s build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
+      - .app
       - artifacts
-      - esnet-smartnic-hw
-    exclude:
-      - .git/**
-      - .git
-      - .gitignore
-      - .gitlab-ci.yml
-      - .gitmodules
+      - esnet-smartnic-hw/open-nic-shell/build
     when: always
-    expire_in: 2 weeks
     reports:
       dotenv:
         bitfile.env
+    expire_in: 2 weeks
   timeout: 9h
-  needs: []
+
+build_au280:
+  extends: .bitfile
+  variables:
+    SN_HW_BOARD: au280
+    IMPL_STRATEGY: Performance_ExplorePostRoutePhysOpt
+  needs:
+    - app_au280
+    - ons_ip_au280
+    - smartnic_ip_au280
+
+.validate:
+  stage: validate
+  extends: .common
+  tags:
+    - ht-misc
+  variables:
+    VALIDATE_WNS_MIN: "-0.100"
+    VALIDATE_TNS_MIN: "-100.0"
+  script:
+    - make -s -C esnet-smartnic-hw validate BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+  artifacts:
+    reports:
+      junit:
+        - esnet-smartnic-hw/open-nic-shell/build/${SN_HW_BOARD}_open-nic-ci/build_summary.xml
+  timeout: 30m
+  rules:
+    - allow_failure: true
+
+validate_au280:
+  extends: .validate
+  variables:
+    VALIDATE_WNS_MIN: "-0.100"
+    VALIDATE_TNS_MIN: "-100.0"
+  needs:
+    - build_au280
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
-      when: manual
       allow_failure: true
 
 .hwapi:
@@ -122,10 +298,8 @@ build_bitfile:
 
 export_hwapi:
   extends: .hwapi
-  variables:
-    SN_HW_APP_NAME: udplb
   needs:
-    - build_bitfile
+    - build_au280
 
 .trigger_fw:
   stage: trigger_downstream
@@ -142,6 +316,7 @@ export_hwapi:
     branch: main
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
     - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
       when: manual
       allow_failure: true
@@ -152,3 +327,5 @@ fw_udplb:
     SN_HW_API_JOB: export_hwapi
   needs:
     - export_hwapi
+    - validate_au280
+
