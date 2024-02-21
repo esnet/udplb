@@ -1,9 +1,9 @@
 # -----------------------------------------------
-# IP config (for compilation library setup)
+# Component setup
 # -----------------------------------------------
-IP_ROOT = ..
+COMPONENT_ROOT := ..
 
-include $(IP_ROOT)/config.mk
+include $(COMPONENT_ROOT)/config.mk
 
 # -----------------------------------------------
 # Configuration
@@ -26,7 +26,7 @@ TOP = $(SVUNIT_TOP) p4_app__tb.tb
 # ----------------------------------------------------
 # Sources
 #   List source files and include directories for test
-#   (see $(SCRIPTS_ROOT)/Makefiles/sources.mk)
+#   (see $(SCRIPTS_ROOT)/Makefiles/templates/sources.mk)
 #   NOTE: SVUnit sources are automatically included
 # ----------------------------------------------------
 SRC_FILES =
@@ -35,16 +35,17 @@ SRC_LIST_FILES = $(SVUNIT_SRC_LIST_FILE)
 
 # ----------------------------------------------------
 # Dependencies
-#   List IP component and external library dependencies
-#   (see $SCRIPTS_ROOT/Makefiles/dependencies.mk for details)
+#   List subcomponent and external library dependencies
+#   (see $SCRIPTS_ROOT/Makefiles/templates/dependencies.mk for details)
 # ----------------------------------------------------
-COMPONENTS = vitisnetp4.ip \
-             vitisnetp4.verif \
-             p4_app.rtl@smartnic \
-             p4_app.verif@smartnic \
-             p4_app.tb@smartnic \
-             axi4l.rtl@common@smartnic \
-             axi4s.rtl@common@smartnic 
+SUBCOMPONENTS = \
+    vitisnetp4.rtl \
+    vitisnetp4.verif \
+    p4_app.rtl@smartnic \
+    p4_app.verif@smartnic \
+    p4_app.tb@smartnic \
+    axi4l.rtl@common@smartnic \
+    axi4s.rtl@common@smartnic
 
 EXT_LIBS =
 
@@ -55,41 +56,43 @@ EXT_LIBS =
 #   command line, as e.g.:
 #     make DEFINES="DEBUG FAST=TRUE"
 # ----------------------------------------------------
-override DEFINES += SIMULATION
+override DEFINES +=
 
 # ----------------------------------------------------
-# VitisNetP4 DPI-C driver
+# Run-time arguments
+#   List runtime arguments passed to simulator as
+#   plusarg (+ARG) references.
+#   Arguments listed here will add to any arguments
+#   set at the command line, as e.g.:
+#   make PLUSARGS="FAST_SIM MODE=1"
 # ----------------------------------------------------
-VITISNETP4_DRV_DPI_DIR = $(OUTPUT_ROOT)/vitisnetp4/ip/sdnet_0
-VITISNETP4_DRV_DPI_LIB = vitisnetp4_drv_dpi
-VITISNETP4_DRV_DPI_FILE = $(VITISNETP4_DRV_DPI_DIR)/$(VITISNETP4_DRV_DPI_LIB).so
+override PLUSARGS +=
 
 # ----------------------------------------------------
 # Options
 # ----------------------------------------------------
-COMPILE_OPTS +=
-
-ELAB_OPTS += --relax --debug typical --sv_lib $(VITISNETP4_DRV_DPI_LIB) --sv_root $(VITISNETP4_DRV_DPI_DIR)
-
-SIM_OPTS +=
+COMPILE_OPTS =
+ELAB_OPTS = --debug typical
+SIM_OPTS =
 
 # ----------------------------------------------------
 # Targets
 # ----------------------------------------------------
 all: p4bm build_test sim
 
+build_test: config _build_test
+sim:        _sim
+info:       _sim_info
+clean:      _clean_test _clean_sim
+
+.PHONY: all build_test sim info clean
+
 p4bm:
 	$(MAKE) -s -C $(APP_DIR)/p4/sim sim-all
 
-build_test: config _build_test
-
 config: $(APP_DIR)/.app/config.mk
 
-sim: _sim
-
-clean: _clean_test _clean_sim
-
-.PHONY: all p4bm build_test config sim clean
+.PHONY: p4bm config
 
 $(APP_DIR)/.app/config.mk: $(APP_DIR)/Makefile
 	@$(MAKE) -s -C $(APP_DIR) config
@@ -110,7 +113,11 @@ SVUNIT_TOP = $(COMPONENT_NAME).$(SVUNIT_TOP_MODULE)
 SVUNIT_SRC_LIST_FILE = $(SVUNIT_FILE_LIST)
 
 # ----------------------------------------------------
+# Import VitisNetP4 IP simulation configuration
+# ----------------------------------------------------
+include $(SCRIPTS_ROOT)/Makefiles/test_vitisnetp4.mk
+
+# ----------------------------------------------------
 # Import Vivado sim targets
 # ----------------------------------------------------
 include $(SCRIPTS_ROOT)/Makefiles/vivado_sim.mk
-
