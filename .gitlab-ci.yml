@@ -91,6 +91,7 @@ app_cache_key:
     - ht-synth
   script:
     - make -s config BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+    - make -s -C .app/src refresh
     - make -s -C .app/app_if build  BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
