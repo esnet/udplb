@@ -61,6 +61,9 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
         w.write(p)
         #print(p.show())
 
+    # Add an ipv4 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -73,6 +76,9 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
         p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
+
+    # Add an ipv6 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
 
     #
     # Test packets for lb_id=1
@@ -105,6 +111,9 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
         w.write(p)
         #print(p.show())
 
+    # Add an ipv4 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -117,3 +126,6 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
         p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
+
+    # Add an ipv6 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
