@@ -72,6 +72,7 @@ app_cache_key:
     - |
       cat <<_EOF | tee dependencies.txt
       VIVADO_VERSION=$VIVADO_VERSION
+      $(git submodule status -- esnet-smartnic-hw | awk '{ print $1,$2 }')
       _EOF
     - |
       cat <<_EOF | tee cache_key.env
