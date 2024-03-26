@@ -44,6 +44,7 @@ SUBCOMPONENTS = \
     p4_app.rtl@smartnic \
     p4_app.verif@smartnic \
     p4_app.tb@smartnic \
+    pcap.pkg@common@smartnic \
     axi4l.rtl@common@smartnic \
     axi4s.rtl@common@smartnic
 
