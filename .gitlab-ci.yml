@@ -51,6 +51,7 @@ sim_app_tests:
   tags:
     - ht-sim
   script:
+    - make -s config
     - make -s -C tests/regression
     - grep 'PASSED.*suites passing' tests/regression/run_$SEED/sim.log
   artifacts:
