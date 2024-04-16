@@ -13,7 +13,7 @@ module udplb_ctrl_unit_test;
     //===================================
     // DUT + testbench
     //===================================
-    // This test suite references the common p4_app
+    // This test suite references the common smartnic_322mhz_app
     // testbench top level. The 'tb' module is
     // loaded into the tb_glbl scope, so is available
     // at tb_glbl.tb.
@@ -27,7 +27,7 @@ module udplb_ctrl_unit_test;
     //===================================
     // Import common testcase tasks
     //===================================
-    `include "../../esnet-smartnic-hw/src/p4_app/tests/common/tasks.svh"
+    `include "../../esnet-smartnic-hw/src/smartnic_322mhz_app/p4_only/tests/common/tasks.svh"
 
     //===================================
     // Build
