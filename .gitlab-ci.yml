@@ -188,8 +188,8 @@ smartnic_ip_cache_key:
   script:
     - make -s -C esnet-smartnic-hw/src refresh
     - make -s -C esnet-smartnic-hw/src synth COMPONENT=smartnic_250mhz.build BOARD=$SN_HW_BOARD
-    - make -s -C esnet-smartnic-hw/src/smartnic_322mhz_app/blackbox/app_if BOARD=$SN_HW_BOARD
-    - make -s -C esnet-smartnic-hw/src synth COMPONENT=smartnic_322mhz.build BOARD=$SN_HW_BOARD
+    - make -s -C esnet-smartnic-hw/src/smartnic_app/blackbox/app_if BOARD=$SN_HW_BOARD
+    - make -s -C esnet-smartnic-hw/src synth COMPONENT=smartnic.build BOARD=$SN_HW_BOARD
   artifacts:
     paths:
       - esnet-smartnic-hw/.out

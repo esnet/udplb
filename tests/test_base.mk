@@ -21,7 +21,7 @@ waves ?= OFF
 # Top
 #   Specify top module(s) for elaboration
 # ----------------------------------------------------
-TOP = $(SVUNIT_TOP) smartnic_322mhz_app__p4_only__tb.tb
+TOP = $(SVUNIT_TOP) smartnic_app__p4_only__tb.tb
 
 # ----------------------------------------------------
 # Sources
@@ -41,9 +41,9 @@ SRC_LIST_FILES = $(SVUNIT_SRC_LIST_FILE)
 SUBCOMPONENTS = \
     vitisnetp4_igr.rtl \
     vitisnetp4_igr.verif \
-    smartnic_322mhz_app.p4_only.rtl \
-    smartnic_322mhz_app.p4_only.verif \
-    smartnic_322mhz_app.p4_only.tb \
+    smartnic_app.p4_only.rtl \
+    smartnic_app.p4_only.verif \
+    smartnic_app.p4_only.tb \
     axi4l.rtl@common@smartnic \
     axi4s.rtl@common@smartnic \
     axi4l.verif@common@smartnic \
