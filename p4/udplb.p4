@@ -459,6 +459,40 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     }
 
     //
+    // IPSrcFilter
+    //
+
+    action allow_ip_src() {
+	// Nothing to do here, basically a no-op
+    }
+
+    table ipv4_src_filter_table {
+	actions = {
+	    drop;
+	    allow_ip_src;
+	}
+	key = {
+	    meta_lb_id : exact;
+	    hdr.ipv4.srcAddr : exact;
+	}
+	size = 256;
+	default_action = drop;
+    }
+
+    table ipv6_src_filter_table {
+	actions = {
+	    drop;
+	    allow_ip_src;
+	}
+	key = {
+	    meta_lb_id : exact;
+	    hdr.ipv6.srcAddr : exact;
+	}
+	size = 256;
+	default_action = drop;
+    }
+
+    //
     // EpochAssign
     //
 
@@ -856,6 +890,27 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd4_ckd);
 	    return;
 #endif // INCLUDE_IPV6ND
+	}
+
+	//
+	// IP source filter
+	//   Only allow forwarding packets from explicitly allowed source IPs
+	//
+
+	if (hdr.ipv4.isValid()) {
+	    hit = ipv4_src_filter_table.apply().hit;
+	    if (!hit) {
+		return;
+	    }
+	} else if (hdr.ipv6.isValid()) {
+	    hit = ipv6_src_filter_table.apply().hit;
+	    if (!hit) {
+		return;
+	    }
+	} else {
+	    // Drop all non-IP packets
+	    drop();
+	    return;
 	}
 
 	bit<16> udplb_ckd = 0;

@@ -34,7 +34,7 @@ P4BM_OUTPUTS        = $(P4BM_LOGFILE_PREFIX)_cli.txt $(P4BM_LOGFILE_PREFIX)_mode
 # Executable pathnames (particularly if they're not in $PATH)
 P4C_VITISNET = p4c-vitisnet
 RUN_P4BM_VITISNET = run-p4bm-vitisnet
-RUN_P4BM_OPTIONS  = -d
+RUN_P4BM_OPTIONS  = 
 
 # ---------------------------------------------------------------------------
 # Targets
