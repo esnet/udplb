@@ -13,7 +13,7 @@ module udplb_ctrl_unit_test;
     //===================================
     // DUT + testbench
     //===================================
-    // This test suite references the common p4_app
+    // This test suite references the common smartnic_app
     // testbench top level. The 'tb' module is
     // loaded into the tb_glbl scope, so is available
     // at tb_glbl.tb.
@@ -27,7 +27,7 @@ module udplb_ctrl_unit_test;
     //===================================
     // Import common testcase tasks
     //===================================
-    `include "../../esnet-smartnic-hw/src/p4_app/tests/common/tasks.svh"
+    `include "../../esnet-smartnic-hw/src/smartnic_app/p4_only/tests/common/tasks.svh"
 
     //===================================
     // Build
@@ -84,26 +84,26 @@ module udplb_ctrl_unit_test;
     //===================================
     `SVUNIT_TESTS_BEGIN
 
-    // Verify expected p4_app status register value
+    // Verify expected p4_only status register value
     `SVTEST(check_status)
         bit error;
         string msg;
 
-        // Check p4_app status register
-        env.p4_app_reg_agent.check_status(error, msg);
+        // Check p4_only status register
+        env.p4_only_reg_agent.check_status(error, msg);
         `FAIL_IF_LOG(
             error == 1,
             msg
         );
     `SVTEST_END
 
-    // Test read access to p4_app.status register
-    `SVTEST(read_p4_app_status)
+    // Test read access to p4_only.status register
+    `SVTEST(read_p4_only_status)
         logic [31:0] got_data;
 
-        // Read p4_app status register
-        env.p4_app_reg_agent.read_status(got_data);
-        `FAIL_UNLESS(got_data == p4_app_reg_pkg::INIT_STATUS);
+        // Read p4_only status register
+        env.p4_only_reg_agent.read_status(got_data);
+        `FAIL_UNLESS(got_data == p4_only_reg_pkg::INIT_STATUS);
     `SVTEST_END
       
     `SVUNIT_TESTS_END

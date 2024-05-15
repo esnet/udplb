@@ -18,7 +18,7 @@ module udplb_datapath_unit_test;
     //===================================
     // DUT + testbench
     //===================================
-    // This test suite references the common p4_app
+    // This test suite references the common smartnic_app
     // testbench top level. The 'tb' module is
     // loaded into the tb_glbl scope, so is available
     // at tb_glbl.tb.
@@ -29,12 +29,12 @@ module udplb_datapath_unit_test;
     // here for convenience.
     tb_pkg::tb_env env;
 
-    vitisnetp4_verif_pkg::vitisnetp4_agent vitisnetp4_agent;
+    vitisnetp4_igr_verif_pkg::vitisnetp4_igr_agent vitisnetp4_agent;
 
     //===================================
     // Import common testcase tasks
     //===================================
-    `include "../../esnet-smartnic-hw/src/p4_app/tests/common/tasks.svh"
+    `include "../../esnet-smartnic-hw/src/smartnic_app/p4_only/tests/common/tasks.svh"
 
     //===================================
     // Build
@@ -67,7 +67,7 @@ module udplb_datapath_unit_test;
         // Issue reset (both datapath and management domains)
         reset();
 
-        // Initialize SDNet tables
+        // Initialize vitisnetp4 tables
         vitisnetp4_agent.init();
 
         // Put AXI-S interfaces into quiescent state
@@ -95,7 +95,7 @@ module udplb_datapath_unit_test;
         env.axis_monitor[1].flush();
         #10us;
 
-        // Clean up SDNet tables
+        // Clean up vitisnetp4 tables
         vitisnetp4_agent.terminate();
 
     endtask
@@ -155,10 +155,10 @@ module udplb_datapath_unit_test;
         debug_msg($sformatf("Write initial timestamp value: %0x", timestamp), VERBOSE);
         env.ts_agent.set_static(timestamp);
 
-        debug_msg("Start writing sdnet_0 tables...", VERBOSE);
+        debug_msg("Start writing vitisnetp4 tables...", VERBOSE);
         filename = {P4_SIM_PATH,"/", testdir, "/runsim.txt"};
         vitisnetp4_agent.table_init_from_file(filename);
-        debug_msg("Done writing sdnet_0 tables...", VERBOSE);
+        debug_msg("Done writing vitisnetp4 tables...", VERBOSE);
 
         debug_msg("Reading expected pcap file...", VERBOSE);
         filename = {P4_SIM_PATH,"/", testdir, "/packets_out.pcap"};
@@ -175,8 +175,8 @@ module udplb_datapath_unit_test;
              begin
                  // If init_timestamp=1, increment timestamp after each tx packet (puts packet # in timestamp field)
                  while ( (init_timestamp == 1) && !rx_done ) begin
-                    @(posedge tb.axis_in_if[0].tlast or posedge rx_done) begin
-                       if (tb.axis_in_if[0].tlast) begin timestamp++; env.ts_agent.set_static(timestamp); end
+                    @(posedge tb.axis_in_if[0][0].tlast or posedge rx_done) begin
+                       if (tb.axis_in_if[0][0].tlast) begin timestamp++; env.ts_agent.set_static(timestamp); end
                     end
                  end
              end

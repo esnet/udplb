@@ -21,7 +21,7 @@ waves ?= OFF
 # Top
 #   Specify top module(s) for elaboration
 # ----------------------------------------------------
-TOP = $(SVUNIT_TOP) p4_app__tb.tb
+TOP = $(SVUNIT_TOP) smartnic_app__p4_only__tb.tb
 
 # ----------------------------------------------------
 # Sources
@@ -39,14 +39,15 @@ SRC_LIST_FILES = $(SVUNIT_SRC_LIST_FILE)
 #   (see $SCRIPTS_ROOT/Makefiles/templates/dependencies.mk for details)
 # ----------------------------------------------------
 SUBCOMPONENTS = \
-    vitisnetp4.rtl \
-    vitisnetp4.verif \
-    p4_app.rtl@smartnic \
-    p4_app.verif@smartnic \
-    p4_app.tb@smartnic \
-    pcap.pkg@common@smartnic \
+    vitisnetp4_igr.rtl \
+    vitisnetp4_igr.verif \
+    smartnic_app.p4_only.rtl \
+    smartnic_app.p4_only.verif \
+    smartnic_app.p4_only.tb \
     axi4l.rtl@common@smartnic \
-    axi4s.rtl@common@smartnic
+    axi4s.rtl@common@smartnic \
+    axi4l.verif@common@smartnic \
+    axi4s.verif@common@smartnic
 
 EXT_LIBS =
 
@@ -81,22 +82,15 @@ SIM_OPTS =
 # ----------------------------------------------------
 all: p4bm build_test sim
 
-build_test: config _build_test
+p4bm:
+	$(MAKE) sim-all P4BM_LOGFILE="-l log" -C $(COMPONENT_ROOT)/../p4/sim
+
+build_test: _build_test
 sim:        _sim
 info:       _sim_info
 clean:      _clean_test _clean_sim
 
-.PHONY: all build_test sim info clean
-
-p4bm:
-	$(MAKE) -s -C $(APP_DIR)/p4/sim sim-all
-
-config: $(APP_DIR)/.app/config.mk
-
-.PHONY: p4bm config
-
-$(APP_DIR)/.app/config.mk: $(APP_DIR)/Makefile
-	@$(MAKE) -s -C $(APP_DIR) config
+.PHONY: all p4bm build_test sim info clean
 
 # ----------------------------------------------------
 # Test configuration

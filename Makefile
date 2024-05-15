@@ -9,10 +9,13 @@ SMARTNIC_DIR := $(CURDIR)/esnet-smartnic-hw
 # If NOT configured, each of these variables gets a default value (as specified below)
 
 # APP_NAME - Application name. Used for default naming conventions below.
-#export APP_NAME := $(notdir $(abspath $(CURDIR)))
+export APP_NAME := $(notdir $(abspath $(CURDIR)))
 
-# P4_FILE - Full pathname of application p4 file.
-#export P4_FILE := $(CURDIR)/p4/$(APP_NAME).p4
+# P4_IGR_FILE - Full pathname of application ingress p4 file.
+#export P4_IGR_FILE := $(CURDIR)/p4/$(APP_NAME)_igr.p4
+
+# P4_EGR_FILE - Full pathname of application egress p4 file.
+#export P4_EGR_FILE := $(CURDIR)/p4/$(APP_NAME)_egr.p4
 
 # ARTIFACTS_DIR - Full pathname of root artifacts directory.
 #export ARTIFACTS_DIR := $(CURDIR)/artifacts
@@ -21,8 +24,16 @@ SMARTNIC_DIR := $(CURDIR)/esnet-smartnic-hw
 #export BUILD_NAME := esnet-smartnic-$(APP_NAME)
 
 # BOARD - Name of AMD (Xilinx) Alveo board used for target application.
-# Supports 'au280' and 'au55c'.  Default is 'au280'.
-#export BOARD := au55c
+# Supports 'au280', 'au250' and 'au55c'.  Default is 'au280'.
+#export BOARD := au280
+
+# AMD example design variables - used to generate the AMD example design (for xsim verilog simulation).
+# EXAMPLE_P4_FILE - Full pathname of p4 file used for example design generation (selects ingress or egress p4 program).
+# EXAMPLE_VITISNETP4_IP_NAME - Selects vitisnetp4 instance for example design.  Supports 'vitisnet_igr' (default) or 'vitisnet_egr'.
+# EXAMPLE_TEST_DIR - Full pathname of p4 test directory used for example design generation.
+export EXAMPLE_P4_FILE := $(CURDIR)/p4/$(APP_NAME).p4
+export EXAMPLE_VITISNETP4_IP_NAME := vitisnetp4_igr
+export EXAMPLE_TEST_DIR := $(CURDIR)/p4/sim/test-1
 
 # Build options
 export max_pkt_len = 9100
@@ -36,10 +47,13 @@ config:
 	@$(MAKE) -s -C $(SMARTNIC_DIR) config APP_DIR=$(CURDIR)
 	@-cp protocols/*.lua $(CURDIR)/.app/app_if/
 
+example:
+	@$(MAKE) -s -C $(SMARTNIC_DIR) example APP_DIR=$(CURDIR)
+
 clean:
 	@$(MAKE) -s -C $(SMARTNIC_DIR) clean_build APP_DIR=$(CURDIR)
 
 clean_artifacts:
 	@$(MAKE) -s -C $(SMARTNIC_DIR) clean_artifacts APP_DIR=$(CURDIR)
 
-.PHONY: build config clean clean_artifacts
+.PHONY: build example config clean clean_artifacts

@@ -30,7 +30,7 @@ make sim
 
 This takes care of all of these steps for you:
   - generate a set of simulation input packets (`packets_in.pcap`)
-  - compile (using p4c-sdnet) your p4 program into the IR (`p4-udplb.json`) required by the simulator
+  - compile (using p4c-vitisnetp4) your p4 program into the IR (`p4-udplb.json`) required by the simulator
   - run the p4 behavioural model controlled by a script (`runsim.txt`) which will
     - preload pipleine table entries
 	- read input packets (`packets_in.pcap`) and metadata (`packets_in.meta`)
