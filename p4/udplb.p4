@@ -412,7 +412,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     bit<128> meta_ip_da = 0;
     bit<48>  meta_mac_sa = 0;
     bit<128> meta_ip_sa = 0;
-    bit<2>   meta_lb_id = 0;
+    bit<3>   meta_lb_id = 0;
 
     action drop() {
 	smeta.drop = 1;
@@ -439,7 +439,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // IPDstFilter
     //
 
-    action set_ip_sa(bit<128> ip_sa, bit<2> lb_id) {
+    action set_ip_sa(bit<128> ip_sa, bit<3> lb_id) {
 	meta_ip_sa = ip_sa;
 	meta_lb_id = lb_id;
     }
@@ -511,7 +511,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    meta_lb_id : exact;
 	    hdr.udplb.tick : lpm;
 	}
-	size = 512;
+	size = 1024;
 	default_action = drop;
     }
 
@@ -537,7 +537,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    meta_epoch : exact;
 	    calendar_slot : exact;
 	}
-	size = 8192;
+	size = 16384;
 	default_action = drop;
     }
     
@@ -576,7 +576,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 4096;
+	size = 8192;
 	default_action = drop;
     }
 
