@@ -115,6 +115,11 @@ app_au280:
   variables:
     SN_HW_BOARD: au280
 
+app_au55c:
+  extends: .app
+  variables:
+    SN_HW_BOARD: au55c
+
 ons_ip_cache_key:
   stage: ip
   extends: .common
@@ -158,6 +163,11 @@ ons_ip_au280:
   extends: .ons_ip
   variables:
     SN_HW_BOARD: au280
+
+ons_ip_au55c:
+  extends: .ons_ip
+  variables:
+    SN_HW_BOARD: au55c
 
 smartnic_ip_cache_key:
   stage: ip
@@ -206,6 +216,11 @@ smartnic_ip_au280:
   variables:
     SN_HW_BOARD: au280
 
+smartnic_ip_au55c:
+  extends: .smartnic_ip
+  variables:
+    SN_HW_BOARD: au55c
+
 .bitfile:
   stage: bitfile
   extends: .common
@@ -243,6 +258,19 @@ build_au280:
     - ons_ip_au280
     - smartnic_ip_au280
 
+build_au55c:
+  extends: .bitfile
+  variables:
+    SN_HW_BOARD: au55c
+    IMPL_STRATEGY: Performance_ExplorePostRoutePhysOpt
+  needs:
+    - app_au55c
+    - ons_ip_au55c
+    - smartnic_ip_au55c
+  rules:
+    - when: manual
+      allow_failure: true
+
 .validate:
   stage: validate
   extends: .common
@@ -268,6 +296,18 @@ validate_au280:
     VALIDATE_TNS_MIN: "-100.0"
   needs:
     - build_au280
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      allow_failure: true
+
+validate_au55c:
+  extends: .validate
+  variables:
+    VALIDATE_WNS_MIN: "-0.100"
+    VALIDATE_TNS_MIN: "-100.0"
+  needs:
+    - build_au55c
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
@@ -299,10 +339,15 @@ validate_au280:
         hwapi.env
   timeout: 30m
 
-export_hwapi:
+hwapi_au280:
   extends: .hwapi
   needs:
     - build_au280
+
+hwapi_au55c:
+  extends: .hwapi
+  needs:
+    - build_au55c
 
 .trigger_fw:
   stage: trigger_downstream
@@ -324,11 +369,19 @@ export_hwapi:
       when: manual
       allow_failure: true
 
-fw_udplb:
+fw_au280:
   extends: .trigger_fw
   variables:
-    SN_HW_API_JOB: export_hwapi
+    SN_HW_API_JOB: hwapi_au280
   needs:
-    - export_hwapi
+    - hwapi_au280
     - validate_au280
+
+fw_au55c:
+  extends: .trigger_fw
+  variables:
+    SN_HW_API_JOB: hwapi_au55c
+  needs:
+    - hwapi_au55c
+    - validate_au55c
 
