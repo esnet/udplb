@@ -132,7 +132,7 @@ module udplb_datapath_unit_test;
     `SVUNIT_TESTS_BEGIN
 
     `SVTEST(test_1)
-        run_pkt_test(.testdir("test-1"), .init_timestamp(1));
+        run_pkt_test(.testdir("test-1"), .expfile("/packets_out.pcap"), .init_timestamp(1));
     `SVTEST_END
 
     `SVUNIT_TESTS_END
