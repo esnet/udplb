@@ -425,6 +425,19 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     //const bit<4> rx_rslt_ok_host                          = 12;
     const bit<4> rx_rslt_ok_lb                            = 13;
 
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.BYTES)   lb_ctx_rx_byte_counter;
+
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_not_ip_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_no_udplb_hdr_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
+
+    Counter<bit<64>, bit<13>>(8192, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<13>>(8192, CounterType_t.BYTES)   lb_mbr_tx_byte_counter;
+
     //
     // MacDstFilter
     //
@@ -937,6 +950,9 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// Packets making it this far are destined for the load balancer offload path
 	rx_rslt_counter.count(rx_rslt_ok_lb);
 
+	lb_ctx_rx_pkt_counter.count(meta_lb_id);
+	lb_ctx_rx_byte_counter.count(meta_lb_id);
+
 	//
 	// IP source filter
 	//   Only allow forwarding packets from explicitly allowed source IPs
@@ -945,15 +961,28 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	if (hdr.ipv4.isValid()) {
 	    hit = ipv4_src_filter_table.apply().hit;
 	    if (!hit) {
+		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
 		return;
 	    }
 	} else if (hdr.ipv6.isValid()) {
 	    hit = ipv6_src_filter_table.apply().hit;
 	    if (!hit) {
+		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
 		return;
 	    }
 	} else {
 	    // Drop all non-IP packets
+	    lb_ctx_drop_not_ip_pkt_counter.count(meta_lb_id);
+	    drop();
+	    return;
+	}
+
+	// Only allow UDP LB packets past this point
+	//
+	// Packets missing this header should have failed at the parser but this will double check
+	// before processing further.
+	if (!hdr.udplb.isValid()) {
+	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(meta_lb_id);
 	    drop();
 	    return;
 	}
@@ -979,6 +1008,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = epoch_assign_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -989,6 +1019,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -998,6 +1029,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = member_info_lookup_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -1018,8 +1050,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Apply the accumulated delta to the IPv4 header checksum
 	    cksum_update_header(hdr.ipv4.hdrChecksum, udplb_ckd);
-	}
-	if (hdr.ipv6.isValid()) {
+	} else if (hdr.ipv6.isValid()) {
 	    // Calculate UDP pseudo header checksum delta using rfc1624 method
 	    cksum_swap_bit128(udplb_ckd, hdr.ipv6.dstAddr, new_ip6_dst);
 	    hdr.ipv6.dstAddr = new_ip6_dst;
@@ -1059,6 +1090,9 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	// Write the updated checksum back into the packet
 	cksum_update_header(hdr.udp.checksum, udplb_ckd);
+
+	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
+	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
     }
 }
 
