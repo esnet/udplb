@@ -408,6 +408,23 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // Raw counter of all received packets
     Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) packet_rx_counter;
 
+    // Counter block to count the types of Rx'd packets
+    Counter<bit<64>, bit<4>>(14, CounterType_t.PACKETS) rx_rslt_counter;
+    const bit<4> rx_rslt_drop_parse_fail                  = 0;
+    const bit<4> rx_rslt_drop_mac_dst_miss                = 1;
+    const bit<4> rx_rslt_drop_not_ip                      = 2;
+    const bit<4> rx_rslt_drop_ip_dst_miss                 = 3;
+    const bit<4> rx_rslt_drop_arp_bad_tpa                 = 4;
+    const bit<4> rx_rslt_drop_icmpv4_echo_bad_dst         = 5;
+    //const bit<4> rx_rslt_drop_icmpv6_echo_bad_dst         = 6;
+    const bit<4> rx_rslt_drop_ipv6nd_neigh_sol_bad_target = 7;
+    const bit<4> rx_rslt_ok_arp_req                       = 8;
+    const bit<4> rx_rslt_ok_icmpv4_echo                   = 9;
+    const bit<4> rx_rslt_ok_icmpv6_echo                   = 10;
+    const bit<4> rx_rslt_ok_ipv6nd_neigh_sol              = 11;
+    //const bit<4> rx_rslt_ok_host                          = 12;
+    const bit<4> rx_rslt_ok_lb                            = 13;
+
     //
     // MacDstFilter
     //
@@ -692,6 +709,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	// Drop all packets that failed the parse stage
 	if (smeta.parser_error != error.NoError) {
+	    rx_rslt_counter.count(rx_rslt_drop_parse_fail);
 	    drop();
 	    return;
 	}
@@ -702,6 +720,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = mac_dst_filter_table.apply().hit;
 	if (!hit) {
+	    rx_rslt_counter.count(rx_rslt_drop_mac_dst_miss);
 	    return;
 	}
 
@@ -718,10 +737,15 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	} else if (hdr.arp.isValid()) {
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
 #endif // INCLUDE_ARP
+	} else {
+	    rx_rslt_counter.count(rx_rslt_drop_not_ip);
+	    drop();
+	    return;
 	}
 
 	hit = ip_dst_filter_table.apply().hit;
 	if (!hit) {
+	    rx_rslt_counter.count(rx_rslt_drop_ip_dst_miss);
 	    return;
 	}
 
@@ -731,6 +755,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	} else if (hdr.arp.isValid()) {
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
+		rx_rslt_counter.count(rx_rslt_drop_arp_bad_tpa);
 		drop();
 		return;
 	    }
@@ -747,6 +772,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    // Send the ethernet frame back to the originator
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    rx_rslt_counter.count(rx_rslt_ok_arp_req);
 	    return;
 #endif // INCLUDE_ARP
 #if INCLUDE_ICMPV4ECHO
@@ -755,6 +782,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Make sure this is a unicast ping for our unicast IPv4 address
 	    if (hdr.ipv4.dstAddr != meta_ip_sa[31:0]) {
+		rx_rslt_counter.count(rx_rslt_drop_icmpv4_echo_bad_dst);
 		drop();
 		return;
 	    }
@@ -773,6 +801,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_add_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv4_common.checksum, v4echo_ckd);
 
+	    rx_rslt_counter.count(rx_rslt_ok_icmpv4_echo);
 	    return;
 #endif  // INCLUDE_ICMPV4ECHO
 #if INCLUDE_ICMPV6ECHO
@@ -802,6 +831,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_add_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6echo_ckd);
 
+	    rx_rslt_counter.count(rx_rslt_ok_icmpv6_echo);
 	    return;
 #endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
@@ -812,6 +842,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Make sure this is an ND solicitation for our unicast IPv6 address
 	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
+		rx_rslt_counter.count(rx_rslt_drop_ipv6nd_neigh_sol_bad_target);
 		drop();
 		return;
 	    }
@@ -897,9 +928,14 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Write the final checksum to the packet
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd4_ckd);
+
+	    rx_rslt_counter.count(rx_rslt_ok_ipv6nd_neigh_sol);
 	    return;
 #endif // INCLUDE_IPV6ND
 	}
+
+	// Packets making it this far are destined for the load balancer offload path
+	rx_rslt_counter.count(rx_rslt_ok_lb);
 
 	//
 	// IP source filter
