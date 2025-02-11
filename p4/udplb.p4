@@ -391,7 +391,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
-	  16w0x4c42: parse_udplb;
+	  16w0x4000 &&& 16w0xC000: parse_udplb;
 	}
     }
 
