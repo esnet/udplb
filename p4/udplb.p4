@@ -405,6 +405,9 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 
 control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
 
+    // Raw counter of all received packets
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) packet_rx_counter;
+
     //
     // MacDstFilter
     //
@@ -683,6 +686,9 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // Entry Point
     apply {
 	bool hit;
+
+	// Count all received packets and bytes
+	packet_rx_counter.count(0);
 
 	// Drop all packets that failed the parse stage
 	if (smeta.parser_error != error.NoError) {
