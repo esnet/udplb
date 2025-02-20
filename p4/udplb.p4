@@ -391,7 +391,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
-	  16w0x4c42: parse_udplb;
+	  16w0x4000 &&& 16w0xC000: parse_udplb;
 	}
     }
 
@@ -404,6 +404,39 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 }
 
 control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
+
+    // Raw counter of all received packets
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) packet_rx_counter;
+
+    // Counter block to count the types of Rx'd packets
+    Counter<bit<64>, bit<4>>(14, CounterType_t.PACKETS) rx_rslt_counter;
+    const bit<4> rx_rslt_drop_parse_fail                  = 0;
+    const bit<4> rx_rslt_drop_mac_dst_miss                = 1;
+    const bit<4> rx_rslt_drop_not_ip                      = 2;
+    const bit<4> rx_rslt_drop_ip_dst_miss                 = 3;
+    const bit<4> rx_rslt_drop_arp_bad_tpa                 = 4;
+    const bit<4> rx_rslt_drop_icmpv4_echo_bad_dst         = 5;
+    //const bit<4> rx_rslt_drop_icmpv6_echo_bad_dst         = 6;
+    const bit<4> rx_rslt_drop_ipv6nd_neigh_sol_bad_target = 7;
+    const bit<4> rx_rslt_ok_arp_req                       = 8;
+    const bit<4> rx_rslt_ok_icmpv4_echo                   = 9;
+    const bit<4> rx_rslt_ok_icmpv6_echo                   = 10;
+    const bit<4> rx_rslt_ok_ipv6nd_neigh_sol              = 11;
+    //const bit<4> rx_rslt_ok_host                          = 12;
+    const bit<4> rx_rslt_ok_lb                            = 13;
+
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.BYTES)   lb_ctx_rx_byte_counter;
+
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_not_ip_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_no_udplb_hdr_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
+
+    Counter<bit<64>, bit<13>>(8192, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<13>>(8192, CounterType_t.BYTES)   lb_mbr_tx_byte_counter;
 
     //
     // MacDstFilter
@@ -550,19 +583,22 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     bit<128> new_ip6_dst          = 0;
     bit<16>  meta_udp_base        = 0;
     bit<8>   meta_entropy_bit_cnt = 0;
+    bool     meta_keep_lb_header  = false;
 
-    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt) {
+    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt, bit<1> keep_lb_header) {
 	new_mac_dst          = mac_dst;
 	new_ip4_dst          = ip_dst;
 	meta_udp_base        = udp_base;
 	meta_entropy_bit_cnt = entropy_bit_cnt;
+	meta_keep_lb_header  = (keep_lb_header == 1w1);
     }
 
-    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt) {
+    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt, bit<1> keep_lb_header) {
 	new_mac_dst          = mac_dst;
 	new_ip6_dst          = ip_dst;
 	meta_udp_base        = udp_base;
 	meta_entropy_bit_cnt = entropy_bit_cnt;
+	meta_keep_lb_header  = (keep_lb_header == 1w1);
     }
 
     table member_info_lookup_table {
@@ -681,8 +717,12 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     apply {
 	bool hit;
 
+	// Count all received packets and bytes
+	packet_rx_counter.count(0);
+
 	// Drop all packets that failed the parse stage
 	if (smeta.parser_error != error.NoError) {
+	    rx_rslt_counter.count(rx_rslt_drop_parse_fail);
 	    drop();
 	    return;
 	}
@@ -693,6 +733,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = mac_dst_filter_table.apply().hit;
 	if (!hit) {
+	    rx_rslt_counter.count(rx_rslt_drop_mac_dst_miss);
 	    return;
 	}
 
@@ -709,10 +750,15 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	} else if (hdr.arp.isValid()) {
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
 #endif // INCLUDE_ARP
+	} else {
+	    rx_rslt_counter.count(rx_rslt_drop_not_ip);
+	    drop();
+	    return;
 	}
 
 	hit = ip_dst_filter_table.apply().hit;
 	if (!hit) {
+	    rx_rslt_counter.count(rx_rslt_drop_ip_dst_miss);
 	    return;
 	}
 
@@ -722,6 +768,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	} else if (hdr.arp.isValid()) {
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
+		rx_rslt_counter.count(rx_rslt_drop_arp_bad_tpa);
 		drop();
 		return;
 	    }
@@ -738,6 +785,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    // Send the ethernet frame back to the originator
 	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 	    hdr.ethernet.srcAddr = meta_mac_sa;
+
+	    rx_rslt_counter.count(rx_rslt_ok_arp_req);
 	    return;
 #endif // INCLUDE_ARP
 #if INCLUDE_ICMPV4ECHO
@@ -746,6 +795,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Make sure this is a unicast ping for our unicast IPv4 address
 	    if (hdr.ipv4.dstAddr != meta_ip_sa[31:0]) {
+		rx_rslt_counter.count(rx_rslt_drop_icmpv4_echo_bad_dst);
 		drop();
 		return;
 	    }
@@ -764,6 +814,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_add_bit16(v4echo_ckd, hdr.icmpv4_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv4_common.checksum, v4echo_ckd);
 
+	    rx_rslt_counter.count(rx_rslt_ok_icmpv4_echo);
 	    return;
 #endif  // INCLUDE_ICMPV4ECHO
 #if INCLUDE_ICMPV6ECHO
@@ -793,6 +844,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    cksum_add_bit16(v6echo_ckd, hdr.icmpv6_common.msg_type_code);
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6echo_ckd);
 
+	    rx_rslt_counter.count(rx_rslt_ok_icmpv6_echo);
 	    return;
 #endif  // INCLUDE_ICMPV6ECHO
 #if INCLUDE_IPV6ND
@@ -803,6 +855,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Make sure this is an ND solicitation for our unicast IPv6 address
 	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
+		rx_rslt_counter.count(rx_rslt_drop_ipv6nd_neigh_sol_bad_target);
 		drop();
 		return;
 	    }
@@ -888,9 +941,17 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    // Write the final checksum to the packet
 	    cksum_update_header(hdr.icmpv6_common.checksum, v6nd4_ckd);
+
+	    rx_rslt_counter.count(rx_rslt_ok_ipv6nd_neigh_sol);
 	    return;
 #endif // INCLUDE_IPV6ND
 	}
+
+	// Packets making it this far are destined for the load balancer offload path
+	rx_rslt_counter.count(rx_rslt_ok_lb);
+
+	lb_ctx_rx_pkt_counter.count(meta_lb_id);
+	lb_ctx_rx_byte_counter.count(meta_lb_id);
 
 	//
 	// IP source filter
@@ -900,15 +961,28 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	if (hdr.ipv4.isValid()) {
 	    hit = ipv4_src_filter_table.apply().hit;
 	    if (!hit) {
+		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
 		return;
 	    }
 	} else if (hdr.ipv6.isValid()) {
 	    hit = ipv6_src_filter_table.apply().hit;
 	    if (!hit) {
+		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
 		return;
 	    }
 	} else {
 	    // Drop all non-IP packets
+	    lb_ctx_drop_not_ip_pkt_counter.count(meta_lb_id);
+	    drop();
+	    return;
+	}
+
+	// Only allow UDP LB packets past this point
+	//
+	// Packets missing this header should have failed at the parser but this will double check
+	// before processing further.
+	if (!hdr.udplb.isValid()) {
+	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(meta_lb_id);
 	    drop();
 	    return;
 	}
@@ -934,6 +1008,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = epoch_assign_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -944,6 +1019,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -953,6 +1029,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	hit = member_info_lookup_table.apply().hit;
 	if (!hit) {
+	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(meta_lb_id);
 	    return;
 	}
 
@@ -964,21 +1041,24 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	if (hdr.ipv4.isValid()) {
 	    // Calculate IPv4 and UDP pseudo header checksum delta using rfc1624 method
 	    cksum_swap_bit32(udplb_ckd, hdr.ipv4.dstAddr, new_ip4_dst);
-	    cksum_swap_bit16(udplb_ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
+	    hdr.ipv4.dstAddr = new_ip4_dst;
+
+	    if (!meta_keep_lb_header) {
+		cksum_swap_bit16(udplb_ckd, hdr.ipv4.totalLen, hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR);
+		hdr.ipv4.totalLen = hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR;
+	    }
 
 	    // Apply the accumulated delta to the IPv4 header checksum
 	    cksum_update_header(hdr.ipv4.hdrChecksum, udplb_ckd);
-
-	    hdr.ipv4.dstAddr = new_ip4_dst;
-	    hdr.ipv4.totalLen = hdr.ipv4.totalLen - SIZEOF_UDPLB_HDR;
-	}
-	if (hdr.ipv6.isValid()) {
+	} else if (hdr.ipv6.isValid()) {
 	    // Calculate UDP pseudo header checksum delta using rfc1624 method
 	    cksum_swap_bit128(udplb_ckd, hdr.ipv6.dstAddr, new_ip6_dst);
-	    cksum_swap_bit16(udplb_ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
-
 	    hdr.ipv6.dstAddr = new_ip6_dst;
-	    hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR;
+
+	    if (!meta_keep_lb_header) {
+		cksum_swap_bit16(udplb_ckd, hdr.ipv6.payloadLen, hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR);
+		hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR;
+	    }
 	}
 
 	// Compute the UDP dst_port between [base, base+2^entropy_bit_count) by mixing in some of the provided entropy
@@ -990,22 +1070,29 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	// Calculate UDP pseudo header checksum delta using rfc1624 method
 
+	// Update the destination port and adjust the checksum
 	cksum_swap_bit16(udplb_ckd, hdr.udp.dstPort, new_udp_dst);
-	cksum_swap_bit16(udplb_ckd, hdr.udp.totalLen, hdr.udp.totalLen - SIZEOF_UDPLB_HDR);
+	hdr.udp.dstPort = new_udp_dst;
 
-	// Subtract out the bytes of the UDP load-balance header
-	cksum_sub_bit16(udplb_ckd, hdr.udplb.magic);
-	cksum_sub_bit16(udplb_ckd, hdr.udplb.version ++ hdr.udplb.proto);
-	cksum_sub_bit16(udplb_ckd, hdr.udplb.rsvd);
-	cksum_sub_bit16(udplb_ckd, hdr.udplb.entropy);
-	cksum_sub_bit64(udplb_ckd, hdr.udplb.tick);
+	if (!meta_keep_lb_header) {
+	    // Subtract out the bytes of the UDP load-balance header
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb.magic);
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb.version ++ hdr.udplb.proto);
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb.rsvd);
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb.entropy);
+	    cksum_sub_bit64(udplb_ckd, hdr.udplb.tick);
+	    hdr.udplb.setInvalid();
+
+	    // Fix up the length to adapt to the dropped udplb header and adjust the checksum using the new length
+	    cksum_swap_bit16(udplb_ckd, hdr.udp.totalLen, hdr.udp.totalLen - SIZEOF_UDPLB_HDR);
+	    hdr.udp.totalLen = hdr.udp.totalLen - SIZEOF_UDPLB_HDR;
+	}
 
 	// Write the updated checksum back into the packet
 	cksum_update_header(hdr.udp.checksum, udplb_ckd);
 
-	// Update the destination port and fix up the length to adapt to the dropped udplb header
-	hdr.udp.dstPort = new_udp_dst;
-	hdr.udp.totalLen = hdr.udp.totalLen - SIZEOF_UDPLB_HDR;
+	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
+	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
     }
 }
 
@@ -1035,6 +1122,7 @@ control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata 
 	packet.emit(hdr.ipv6nd_adv_option_lladdr);
 #endif // INCLUDE_IPV6ND
         packet.emit(hdr.udp);
+	packet.emit(hdr.udplb);
     }
 }
 
