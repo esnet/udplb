@@ -38,6 +38,12 @@ SUBCOMPONENTS = \
 
 EXT_LIBS =
 
+SRC_FILES += \
+    $(LIB_OUTPUT_ROOT)/vitisnetp4_igr/ip/vitisnetp4_igr/src/verilog/vitisnetp4_igr_counter_extern.sv \
+    $(LIB_OUTPUT_ROOT)/vitisnetp4_igr/ip/vitisnetp4_igr/src/verilog/vitisnetp4_igr_counter_top.sv
+
+INC_DIRS += \
+	$(LIB_OUTPUT_ROOT)/vitisnetp4_igr/ip/vitisnetp4_igr/hdl/fpga_asic_macros_v1_0/hdl/include/fpga
 # ----------------------------------------------------
 # Defines
 #   List macro definitions.

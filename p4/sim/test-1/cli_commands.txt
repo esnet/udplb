@@ -56,8 +56,8 @@ table_add epoch_assign_table do_assign_epoch 0 0x0000000000000000/0 => 0x0000000
 table_add epoch_assign_table do_assign_epoch 0 0x0000000000000010/60 => 0x00000001 5
 table_add load_balance_calendar_table do_assign_member 0 0x00000000 0x00a => 0x0000
 table_add load_balance_calendar_table do_assign_member 0 0x00000001 0x014 => 0x0000
-table_add member_info_lookup_table do_ipv4_member_rewrite 0 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4
-table_add member_info_lookup_table do_ipv6_member_rewrite 0 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4
+table_add member_info_lookup_table do_ipv4_member_rewrite 0 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4 0
+table_add member_info_lookup_table do_ipv6_member_rewrite 0 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4 0
 
 ##########################################################################
 # Load Balancer Instance #1
@@ -94,7 +94,112 @@ table_add epoch_assign_table do_assign_epoch 1 0x0000000000000000/0 => 0x0000000
 table_add epoch_assign_table do_assign_epoch 1 0x0000000000000010/60 => 0x00000001 5
 table_add load_balance_calendar_table do_assign_member 1 0x00000000 0x00a => 0x0000
 table_add load_balance_calendar_table do_assign_member 1 0x00000001 0x014 => 0x0000
-table_add member_info_lookup_table do_ipv4_member_rewrite 1 0x0800 0x0000 => 0x998877665544 0x0a0b0c0d 0x1112 2
-table_add member_info_lookup_table do_ipv6_member_rewrite 1 0x86dd 0x0000 => 0x998877665544 0xfe80aa00000000000000000000000004 0x1111 2
+table_add member_info_lookup_table do_ipv4_member_rewrite 1 0x0800 0x0000 => 0x998877665544 0x0a0b0c0d 0x4c42 0 1
+table_add member_info_lookup_table do_ipv6_member_rewrite 1 0x86dd 0x0000 => 0x998877665544 0xfe80aa00000000000000000000000004 0x4c42 0 1
 
 run_traffic packets
+
+counter_read packet_rx_counter 0
+
+counter_read rx_rslt_counter 0
+counter_read rx_rslt_counter 1
+counter_read rx_rslt_counter 2
+counter_read rx_rslt_counter 3
+counter_read rx_rslt_counter 4
+counter_read rx_rslt_counter 5
+counter_read rx_rslt_counter 6
+counter_read rx_rslt_counter 7
+counter_read rx_rslt_counter 8
+counter_read rx_rslt_counter 9
+counter_read rx_rslt_counter 10
+counter_read rx_rslt_counter 11
+counter_read rx_rslt_counter 12
+counter_read rx_rslt_counter 13
+
+counter_read lb_ctx_rx_pkt_counter  0
+counter_read lb_ctx_rx_byte_counter 0
+counter_read lb_ctx_rx_pkt_counter  1
+counter_read lb_ctx_rx_byte_counter 1
+counter_read lb_ctx_rx_pkt_counter  2
+counter_read lb_ctx_rx_byte_counter 2
+counter_read lb_ctx_rx_pkt_counter  3
+counter_read lb_ctx_rx_byte_counter 3
+counter_read lb_ctx_rx_pkt_counter  4
+counter_read lb_ctx_rx_byte_counter 4
+counter_read lb_ctx_rx_pkt_counter  5
+counter_read lb_ctx_rx_byte_counter 5
+counter_read lb_ctx_rx_pkt_counter  6
+counter_read lb_ctx_rx_byte_counter 6
+counter_read lb_ctx_rx_pkt_counter  7
+counter_read lb_ctx_rx_byte_counter 7
+
+counter_read lb_ctx_drop_blocked_src_pkt_counter 0
+counter_read lb_ctx_drop_blocked_src_pkt_counter 1
+counter_read lb_ctx_drop_blocked_src_pkt_counter 2
+counter_read lb_ctx_drop_blocked_src_pkt_counter 3
+counter_read lb_ctx_drop_blocked_src_pkt_counter 4
+counter_read lb_ctx_drop_blocked_src_pkt_counter 5
+counter_read lb_ctx_drop_blocked_src_pkt_counter 6
+counter_read lb_ctx_drop_blocked_src_pkt_counter 7
+
+counter_read lb_ctx_drop_not_ip_pkt_counter 0
+counter_read lb_ctx_drop_not_ip_pkt_counter 1
+counter_read lb_ctx_drop_not_ip_pkt_counter 2
+counter_read lb_ctx_drop_not_ip_pkt_counter 3
+counter_read lb_ctx_drop_not_ip_pkt_counter 4
+counter_read lb_ctx_drop_not_ip_pkt_counter 5
+counter_read lb_ctx_drop_not_ip_pkt_counter 6
+counter_read lb_ctx_drop_not_ip_pkt_counter 7
+
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 0
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 1
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 2
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 3
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 4
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 5
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 6
+counter_read lb_ctx_drop_no_udplb_hdr_pkt_counter 7
+
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 0
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 1
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 2
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 3
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 4
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 5
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 6
+counter_read lb_ctx_drop_epoch_assign_miss_pkt_counter 7
+
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 0
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 1
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 2
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 3
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 4
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 5
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 6
+counter_read lb_ctx_drop_lb_calendar_miss_pkt_counter 7
+
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 0
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 1
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 2
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 3
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 4
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 5
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 6
+counter_read lb_ctx_drop_mbr_info_miss_pkt_counter 7
+
+counter_read lb_mbr_tx_pkt_counter     0
+counter_read lb_mbr_tx_byte_counter    0
+counter_read lb_mbr_tx_pkt_counter     1
+counter_read lb_mbr_tx_byte_counter    1
+counter_read lb_mbr_tx_pkt_counter     2
+counter_read lb_mbr_tx_byte_counter    2
+counter_read lb_mbr_tx_pkt_counter     3
+counter_read lb_mbr_tx_byte_counter    3
+counter_read lb_mbr_tx_pkt_counter     4
+counter_read lb_mbr_tx_byte_counter    4
+counter_read lb_mbr_tx_pkt_counter     5
+counter_read lb_mbr_tx_byte_counter    5
+counter_read lb_mbr_tx_pkt_counter     6
+counter_read lb_mbr_tx_byte_counter    6
+counter_read lb_mbr_tx_pkt_counter     7
+counter_read lb_mbr_tx_byte_counter    7
