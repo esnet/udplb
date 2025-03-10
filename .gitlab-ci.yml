@@ -267,9 +267,6 @@ build_au55c:
     - app_au55c
     - ons_ip_au55c
     - smartnic_ip_au55c
-  rules:
-    - when: manual
-      allow_failure: true
 
 .validate:
   stage: validate
