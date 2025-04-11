@@ -10,6 +10,7 @@ SMARTNIC_DIR := $(CURDIR)/esnet-smartnic-hw
 
 # APP_NAME - Application name. Used for default naming conventions below.
 export APP_NAME := $(notdir $(abspath $(CURDIR)))
+export P4_METADATA := $(CURDIR)/p4/$(APP_NAME)-metadata.yaml
 
 # P4_IGR_FILE - Full pathname of application ingress p4 file.
 #export P4_IGR_FILE := $(CURDIR)/p4/$(APP_NAME)_igr.p4

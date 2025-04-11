@@ -1,0 +1,31 @@
+counter_blocks:
+  rx_rslt_counter:
+    counters:
+      0:
+        alias: rx_rslt_drop_parse_fail
+      1:
+        alias: rx_rslt_drop_mac_dst_miss
+      2:
+        alias: rx_rslt_drop_not_ip
+      3:
+        alias: rx_rslt_drop_ip_dst_miss
+      4:
+        alias: rx_rslt_drop_arp_bad_tpa
+      5:
+        alias: rx_rslt_drop_icmpv4_echo_bad_dst
+      6:
+        alias: rx_rslt_drop_icmpv6_echo_bad_dst
+      7:
+        alias: rx_rslt_drop_ipv6nd_neigh_sol_bad_target
+      8:
+        alias: rx_rslt_ok_arp_req
+      9:
+        alias: rx_rslt_ok_icmpv4_echo
+      10:
+        alias: rx_rslt_ok_icmpv6_echo
+      11:
+        alias: rx_rslt_ok_ipv6nd_neigh_sol
+      12:
+        alias: rx_rslt_ok_host
+      13:
+        alias: rx_rslt_ok_lb
