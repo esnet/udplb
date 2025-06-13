@@ -1,7 +1,5 @@
 `include "svunit_defines.svh"
 
-import tb_pkg::*;
-
 //===================================
 // (Failsafe) timeout
 //===================================
@@ -27,13 +25,15 @@ module udplb_datapath_unit_test;
     // via the testbench environment class (tb_env). A
     // reference to the testbench environment is provided
     // here for convenience.
+    tb_pkg::tb_env env;
+
+    // VitisNetP4 table agent
+    vitisnetp4_igr_verif_pkg::vitisnetp4_igr_agent vitisnetp4_agent;
 
     //===================================
     // Import common testcase tasks
     //===================================
     `include "../../esnet-smartnic-hw/src/smartnic_app/tests/common/tasks.svh"
-
-    initial P4_SIM_PATH = "../../../p4/sim/";
 
     //===================================
     // Build
@@ -59,30 +59,15 @@ module udplb_datapath_unit_test;
     task setup();
         svunit_ut.setup();
 
-        // Flush packets from pipeline
-        for (integer i = 0; i < 2; i += 1) begin
-            env.axis_out_monitor[i].flush();
-            for (integer j = 0; j < 3; j += 1) begin
-                env.axis_c2h_monitor[j][i].flush();
-            end
-        end
-
-        // Issue reset (both datapath and management domains)
-        reset();
+        // start environment
+        env.run();
 
         // Initialize vitisnetp4 tables
         vitisnetp4_agent.init();
 
-        // Put AXI-S interfaces into quiescent state
-        for (integer i = 0; i < 2; i += 1) begin
-            env.axis_in_driver[i].idle();
-            env.axis_out_monitor[i].idle();
-            for (integer j = 0; j < 3; j += 1) begin
-                env.axis_h2c_driver[j][i].idle();
-                env.axis_c2h_monitor[j][i].idle();
-            end
-        end
+        p4_sim_dir = "../../../p4/sim/";
 
+        #100ns;
     endtask
 
 
@@ -91,24 +76,13 @@ module udplb_datapath_unit_test;
     // need after running the Unit Tests
     //===================================
     task teardown();
-        `INFO("Waiting to end testcase...");
-        for (integer i = 0; i < 100 ; i=i+1 ) @(posedge tb.clk);
-        `INFO("Ending testcase!");
+        // Stop environment
+        env.stop();
 
         svunit_ut.teardown();
 
-        // Flush remaining packets
-        for (integer i = 0; i < 2; i += 1) begin
-            env.axis_out_monitor[i].flush();
-            for (integer j = 0; j < 3; j += 1) begin
-                env.axis_c2h_monitor[j][i].flush();
-            end
-        end
-        #10us;
-
         // Clean up vitisnetp4 tables
         vitisnetp4_agent.terminate();
-
     endtask
 
     //=======================================================================
@@ -132,7 +106,7 @@ module udplb_datapath_unit_test;
     `SVUNIT_TESTS_BEGIN
 
     `SVTEST(test_1)
-        run_pkt_test(.testdir("test-1"), .expfile("/packets_out.pcap"), .init_timestamp(1));
+        run_pkt_test(.testdir("test-1"));
     `SVTEST_END
 
     `SVUNIT_TESTS_END
