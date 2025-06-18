@@ -42,15 +42,13 @@ module udplb_datapath_unit_test;
         svunit_ut = new(name);
 
         // Build testbench
-        tb.build();
-
-        // Retrieve reference to testbench environment class
-        env = tb.env;
+        env = tb.build();
+        env.set_debug_level(1);
 
         // Create P4 table agent
         vitisnetp4_agent = new;
-        vitisnetp4_agent.create("tb"); // DPI-C P4 table agent requires hierarchical
-                                       // path to AXI-L write/read tasks
+        vitisnetp4_agent.create(p4_dpic_hier_path); // DPI-C P4 table agent requires hierarchical
+                                                    // path to AXI-L write/read tasks
     endfunction
 
     //===================================
