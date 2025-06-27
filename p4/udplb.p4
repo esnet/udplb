@@ -560,14 +560,25 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
     bit<64> tick = 0;
     bit<32> meta_epoch = 0;
+    bit<5> meta_slot_select_bit_cnt = 0;
+    bit<16> meta_slot_select_xor = 0;
     
     action do_assign_epoch(bit<32> epoch) {
 	meta_epoch = epoch;
+	meta_slot_select_bit_cnt = 9;
+	meta_slot_select_xor = 0;
+    }
+
+    action do_assign_epoch_with_slot_sel_opts(bit<32> epoch, bit<5> slot_select_bit_cnt, bit<16> slot_select_xor) {
+	meta_epoch = epoch;
+	meta_slot_select_bit_cnt = slot_select_bit_cnt;
+	meta_slot_select_xor = slot_select_xor;
     }
 
     table epoch_assign_table {
 	actions = {
 	    do_assign_epoch;
+	    do_assign_epoch_with_slot_sel_opts;
 	    drop;
 	}
 	key = {
@@ -1065,19 +1076,21 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 
 	// Normalize the slot_select value across the different LB protocol versions
-	bit<9> slot_select = 0;
+	bit<16> slot_select = 0;
 
 	if (hdr.udplb_v2.isValid()) {
 	    // v2 uses lsbs of tick field as the slot selector
-	    slot_select = hdr.udplb_v2.tick[8:0];
+	    slot_select = hdr.udplb_v2.tick[15:0];
 	} else if (hdr.udplb_v3.isValid()) {
 	    // v3 uses a dedicated field as the slot selector
-	    slot_select = hdr.udplb_v3.slot_select[8:0];
+	    slot_select = hdr.udplb_v3.slot_select[15:0];
 	}
 
+	// The number of significant bits for the calendar lookup can vary dynamically by epoch
+	bit<16> slot_select_mask = (bit<16>)(((bit<16>)1 << meta_slot_select_bit_cnt)-1);
 
 	// Pick the calendar slot for this packet
-	calendar_slot = slot_select;
+	calendar_slot = (slot_select ^ meta_slot_select_xor) & slot_select_mask;
 
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {

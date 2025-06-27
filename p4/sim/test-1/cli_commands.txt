@@ -52,10 +52,10 @@ table_add ipv4_src_filter_table allow_ip_src 0 0x0a010202 =>
 table_add ipv6_src_filter_table allow_ip_src 0 0xfe800000000000000000000000000001 =>
 
 # Load balancer config
-table_add epoch_assign_table do_assign_epoch 0 0x0000000000000000/0 => 0x00000000 63
-table_add epoch_assign_table do_assign_epoch 0 0x0000000000000010/60 => 0x00000001 5
-table_add load_balance_calendar_table do_assign_member 0 0x00000000 0x00a => 0x0000
-table_add load_balance_calendar_table do_assign_member 0 0x00000001 0x014 => 0x0000
+table_add epoch_assign_table do_assign_epoch_with_slot_sel_opts 0 0x0000000000000000/0 => 0x00000000 3 0xffff 63
+table_add epoch_assign_table do_assign_epoch_with_slot_sel_opts 0 0x0000000000000010/60 => 0x00000001 3 0xffff 5
+table_add load_balance_calendar_table do_assign_member 0 0x00000000 0x005 => 0x0000
+table_add load_balance_calendar_table do_assign_member 0 0x00000001 0x003 => 0x0000
 table_add member_info_lookup_table do_ipv4_member_rewrite 0 0x0800 0x0000 => 0x112233445566 0xaabbccdd 0x4556 4 0
 table_add member_info_lookup_table do_ipv6_member_rewrite 0 0x86dd 0x0000 => 0x112233445566 0xfe80aa00000000000000000000000003 0x4556 4 0
 
