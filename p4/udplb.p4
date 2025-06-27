@@ -150,12 +150,21 @@ header udp_t {
     bit<16> checksum;
 }
 
-header udplb_t {
+header udplb_common_t {
     bit<16> magic; 		/* LB */
     bit<8> version;
     bit<8> proto;
+}
+
+header udplb_v2_t {
     bit<16> rsvd;
     bit<16> entropy;
+    bit<64> tick;
+}
+
+header udplb_v3_t {
+    bit<16> slot_select;
+    bit<16> port_select;
     bit<64> tick;
 }
 #define SIZEOF_UDPLB_HDR 16
@@ -188,7 +197,9 @@ struct headers {
     ipv6nd_adv_option_lladdr_t  ipv6nd_adv_option_lladdr;
 #endif // INCLUDE_IPV6ND
     udp_t                   udp;
-    udplb_t                 udplb;
+    udplb_common_t          udplb_common;
+    udplb_v2_t              udplb_v2;
+    udplb_v3_t              udplb_v3;
 }
 
 // User-defined errors 
@@ -201,8 +212,7 @@ error {
     UnhandledArpOper,
 #endif // INCLUDE_ARP
     InvalidIPpacket,
-    InvalidUDPLBmagic,
-    InvalidUDPLBversion
+    InvalidUDPLBmagic
 }
 
 #if (CKSUM_MODE == CKSUM_MODE_OMITTED)
@@ -392,15 +402,27 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
-	  16w0x4000 &&& 16w0xC000: parse_udplb;
+	  16w0x4000 &&& 16w0xC000: parse_udplb_common;
 	}
     }
 
-    state parse_udplb {
-      packet.extract(hdr.udplb);
-      verify(hdr.udplb.magic == 0x4c42, error.InvalidUDPLBmagic);
-      verify(hdr.udplb.version == 2, error.InvalidUDPLBversion);
-      transition accept;
+    state parse_udplb_common {
+	packet.extract(hdr.udplb_common);
+	verify(hdr.udplb_common.magic == 0x4c42, error.InvalidUDPLBmagic);
+	transition select(hdr.udplb_common.version) {
+            8w2: parse_udplb_v2;
+	    8w3: parse_udplb_v3;
+	}
+    }
+
+    state parse_udplb_v2 {
+	packet.extract(hdr.udplb_v2);
+	transition accept;
+    }
+
+    state parse_udplb_v3 {
+	packet.extract(hdr.udplb_v3);
+	transition accept;
     }
 }
 
@@ -432,9 +454,13 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_not_ip_pkt_counter;
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_no_udplb_hdr_pkt_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_bad_udplb_version_pkt_counter;
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
     Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
+
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_v2_counter;
+    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_v3_counter;
 
     Counter<bit<64>, bit<13>>(8192, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
     Counter<bit<64>, bit<13>>(8192, CounterType_t.BYTES)   lb_mbr_tx_byte_counter;
@@ -532,6 +558,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // EpochAssign
     //
 
+    bit<64> tick = 0;
     bit<32> meta_epoch = 0;
     
     action do_assign_epoch(bit<32> epoch) {
@@ -545,7 +572,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	}
 	key = {
 	    meta_lb_id : exact;
-	    hdr.udplb.tick : lpm;
+	    tick : lpm;
 	}
 	size = 1024;
 	default_action = drop;
@@ -555,8 +582,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // LoadBalanceCalendar
     //
 
-    // Use lsbs of tick to select a calendar slot
-    bit<9> calendar_slot = 0;
+    bit<16> calendar_slot = 0;
     bit<16> meta_member_id = 0;
 
     action do_assign_member(bit<16> member_id) {
@@ -581,27 +607,27 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     // MemberInfoLookup
     //
 
-    bit<48>  new_mac_dst          = 0;
-    bit<32>  new_ip4_dst          = 0;
-    bit<128> new_ip6_dst          = 0;
-    bit<16>  meta_udp_base        = 0;
-    bit<8>   meta_entropy_bit_cnt = 0;
-    bool     meta_keep_lb_header  = false;
+    bit<48>  new_mac_dst              = 0;
+    bit<32>  new_ip4_dst              = 0;
+    bit<128> new_ip6_dst              = 0;
+    bit<16>  meta_udp_base            = 0;
+    bit<5>   meta_port_select_bit_cnt = 0;
+    bool     meta_keep_lb_header      = false;
 
-    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt, bit<1> keep_lb_header) {
-	new_mac_dst          = mac_dst;
-	new_ip4_dst          = ip_dst;
-	meta_udp_base        = udp_base;
-	meta_entropy_bit_cnt = entropy_bit_cnt;
-	meta_keep_lb_header  = (keep_lb_header == 1w1);
+    action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<5> port_select_bit_cnt, bit<1> keep_lb_header) {
+	new_mac_dst              = mac_dst;
+	new_ip4_dst              = ip_dst;
+	meta_udp_base            = udp_base;
+	meta_port_select_bit_cnt = port_select_bit_cnt;
+	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
-    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_base, bit<8> entropy_bit_cnt, bit<1> keep_lb_header) {
-	new_mac_dst          = mac_dst;
-	new_ip6_dst          = ip_dst;
-	meta_udp_base        = udp_base;
-	meta_entropy_bit_cnt = entropy_bit_cnt;
-	meta_keep_lb_header  = (keep_lb_header == 1w1);
+    action do_ipv6_member_rewrite(bit<48> mac_dst, bit<128> ip_dst, bit<16> udp_base, bit<5> port_select_bit_cnt, bit<1> keep_lb_header) {
+	new_mac_dst              = mac_dst;
+	new_ip6_dst              = ip_dst;
+	meta_udp_base            = udp_base;
+	meta_port_select_bit_cnt = port_select_bit_cnt;
+	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
     table member_info_lookup_table {
@@ -984,8 +1010,19 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	//
 	// Packets missing this header should have failed at the parser but this will double check
 	// before processing further.
-	if (!hdr.udplb.isValid()) {
+	if (!hdr.udplb_common.isValid()) {
 	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(meta_lb_id);
+	    drop();
+	    return;
+	}
+
+	// Make sure we have a supported udplb version header
+	if (hdr.udplb_v2.isValid()) {
+	    lb_ctx_rx_v2_counter.count(meta_lb_id);
+	} else if (hdr.udplb_v3.isValid()) {
+	    lb_ctx_rx_v3_counter.count(meta_lb_id);
+	} else {
+	    lb_ctx_drop_bad_udplb_version_pkt_counter.count(meta_lb_id);
 	    drop();
 	    return;
 	}
@@ -1009,6 +1046,13 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// EpochAssign
 	//
 
+	// Normalize the tick value across the different LB protocol versions
+	if (hdr.udplb_v2.isValid()) {
+	    tick = hdr.udplb_v2.tick;
+	} else if (hdr.udplb_v3.isValid()) {
+	    tick = hdr.udplb_v3.tick;
+	}
+
 	hit = epoch_assign_table.apply().hit;
 	if (!hit) {
 	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(meta_lb_id);
@@ -1019,7 +1063,22 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// LoadBalanceCalendar
 	//
 
-	calendar_slot = (bit<9>) hdr.udplb.tick & 0x1FF;
+
+	// Normalize the slot_select value across the different LB protocol versions
+	bit<9> slot_select = 0;
+
+	if (hdr.udplb_v2.isValid()) {
+	    // v2 uses lsbs of tick field as the slot selector
+	    slot_select = hdr.udplb_v2.tick[8:0];
+	} else if (hdr.udplb_v3.isValid()) {
+	    // v3 uses a dedicated field as the slot selector
+	    slot_select = hdr.udplb_v3.slot_select[8:0];
+	}
+
+
+	// Pick the calendar slot for this packet
+	calendar_slot = slot_select;
+
 	hit = load_balance_calendar_table.apply().hit;
 	if (!hit) {
 	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(meta_lb_id);
@@ -1064,8 +1123,20 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    }
 	}
 
-	// Compute the UDP dst_port between [base, base+2^entropy_bit_count) by mixing in some of the provided entropy
-	bit<16> new_udp_dst = meta_udp_base + (hdr.udplb.entropy & (bit<16>)(((bit<16>)1 << meta_entropy_bit_cnt)-1));
+	// Normalize the port_select value across the different LB protocol versions
+	bit<16> port_select = 0;
+
+	if (hdr.udplb_v2.isValid()) {
+	    port_select = hdr.udplb_v2.entropy;
+	} else if (hdr.udplb_v3.isValid()) {
+	    port_select = hdr.udplb_v3.port_select;
+	}
+
+	// The number of significant bits for the port offset varies by LB member
+	bit<16> port_select_mask = (bit<16>)(((bit<16>)1 << meta_port_select_bit_cnt)-1);
+
+	// Compute the UDP dst_port between [base, base+2^port_select_bit_count) by mixing in some of the provided entropy
+	bit<16> new_udp_dst = meta_udp_base + (port_select & port_select_mask);
 
 	//
 	// UpdateUDPChecksum
@@ -1079,12 +1150,20 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	if (!meta_keep_lb_header) {
 	    // Subtract out the bytes of the UDP load-balance header
-	    cksum_sub_bit16(udplb_ckd, hdr.udplb.magic);
-	    cksum_sub_bit16(udplb_ckd, hdr.udplb.version ++ hdr.udplb.proto);
-	    cksum_sub_bit16(udplb_ckd, hdr.udplb.rsvd);
-	    cksum_sub_bit16(udplb_ckd, hdr.udplb.entropy);
-	    cksum_sub_bit64(udplb_ckd, hdr.udplb.tick);
-	    hdr.udplb.setInvalid();
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb_common.magic);
+	    cksum_sub_bit16(udplb_ckd, hdr.udplb_common.version ++ hdr.udplb_common.proto);
+	    hdr.udplb_common.setInvalid();
+	    if (hdr.udplb_v2.isValid()) {
+		cksum_sub_bit16(udplb_ckd, hdr.udplb_v2.rsvd);
+		cksum_sub_bit16(udplb_ckd, hdr.udplb_v2.entropy);
+		cksum_sub_bit64(udplb_ckd, hdr.udplb_v2.tick);
+		hdr.udplb_v2.setInvalid();
+	    } else if (hdr.udplb_v3.isValid()) {
+		cksum_sub_bit16(udplb_ckd, hdr.udplb_v3.slot_select);
+		cksum_sub_bit16(udplb_ckd, hdr.udplb_v3.port_select);
+		cksum_sub_bit64(udplb_ckd, hdr.udplb_v3.tick);
+		hdr.udplb_v3.setInvalid();
+	    }
 
 	    // Fix up the length to adapt to the dropped udplb header and adjust the checksum using the new length
 	    cksum_swap_bit16(udplb_ckd, hdr.udp.totalLen, hdr.udp.totalLen - SIZEOF_UDPLB_HDR);
@@ -1125,7 +1204,9 @@ control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata 
 	packet.emit(hdr.ipv6nd_adv_option_lladdr);
 #endif // INCLUDE_IPV6ND
         packet.emit(hdr.udp);
-	packet.emit(hdr.udplb);
+	packet.emit(hdr.udplb_common);
+	packet.emit(hdr.udplb_v2);
+	packet.emit(hdr.udplb_v3);
     }
 }
 
