@@ -38,11 +38,26 @@ p4bm:
     - apt update -y
     - apt install -y python3-setuptools
     - pip3 install scapy
-    - make -s -C p4/sim build sim-all
+    - pip3 install robotframework
+    - make -s -C p4 compile
+    - |
+      robot --variable P4_HW_ENV:p4bm-sim \
+            --pythonpath=esnet-smartnic-hw/test/library/p4_robot_p4bm \
+            --pythonpath=esnet-smartnic-hw/test/library/p4_robot \
+            --pythonpath=esnet-smartnic-hw/test/library/packet_robot \
+            --pythonpath=robot-tests/library/lb_robot \
+            --pythonpath=robot-tests/library/packet_lb_robot \
+            -d robot-output/ \
+            robot-tests/p4-tests.robot
+    - rebot --xunit robot-output/output.xunit.xml robot-output/output.xml
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+    reports:
+      junit:
+        - robot-output/output.xunit.xml
     paths:
-      - p4/sim
+      - robot-tests
+      - robot-output
   needs: []
 
 sim_app_tests:
