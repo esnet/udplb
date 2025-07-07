@@ -48,3 +48,5 @@ artifacts/
 # Output dirs        #
 ######################
 **/.app
+robot-output/
+

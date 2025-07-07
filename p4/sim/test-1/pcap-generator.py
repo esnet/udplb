@@ -2,14 +2,25 @@
 
 from scapy.all import *
 
-class UDPLB(Packet):
-    name = "UDP LB Packet"
+class UDPLBv2(Packet):
+    name = "UDP LB v2 Packet"
     fields_desc = [
         XShortField("magic", 0x4C42),
         XByteField("version", 2),
         XByteField("proto", 0),
         XShortField("rsvd", 0),
         XShortField("entropy", 0),
+        XLongField("tick", 0),
+    ]
+
+class UDPLBv3(Packet):
+    name = "UDP LB v3 Packet"
+    fields_desc = [
+        XShortField("magic", 0x4C42),
+        XByteField("version", 3),
+        XByteField("proto", 0),
+        XShortField("slotselect", 0),
+        XShortField("portselect", 0),
         XLongField("tick", 0),
     ]
 
@@ -24,13 +35,14 @@ class EVIO6Seg(Packet):
         XShortField("rocid", 0),
         XIntField("offset", 0),]
 
-bind_layers(UDPLB, EVIO6Seg, {'proto': 1})
+bind_layers(UDPLBv2, EVIO6Seg, {'proto': 1})
+bind_layers(UDPLBv3, EVIO6Seg, {'proto': 1})
 
 EVIO6_BLOB_SIZE = 1050
 evio6_blob = bytearray(EVIO6_BLOB_SIZE)
 EVIO6_SEG_SIZE = 100
 
-with scapy.utils.PcapWriter('packets_in.pcap') as w:
+def generate_lb0_misc(w):
     #
     # Test packets for lb_id=0
     #
@@ -48,6 +60,7 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
     p = Ether(dst="33:33:ff:cc:dd:ee", src="00:11:22:33:44:55") / IPv6(dst="ff02::1:ffcc:ddee", src="::")/ICMPv6ND_NS(tgt="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee")
     w.write(p)
 
+def generate_lb0_ipv4_v2(w):
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -57,13 +70,14 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
             # last (possibly short) segment
             flags.append("last")
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLBv2(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
 
     # Add an ipv4 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
-    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLBv2(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
 
+def generate_lb0_ipv6_v2(w):
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -73,17 +87,48 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
             # last (possibly short) segment
             flags.append("last")
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLBv2(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
 
     # Add an ipv6 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
-    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLBv2(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
 
-    #
-    # Test packets for lb_id=1
-    #
+def generate_lb0_ipv4_v3(w):
+    for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
+        flags = []
+        if offset == 0:
+            # first segment
+            flags.append("first")
+        if offset + EVIO6_SEG_SIZE > EVIO6_BLOB_SIZE:
+            # last (possibly short) segment
+            flags.append("last")
 
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLBv3(tick=10, slotselect=10, portselect=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        w.write(p)
+        #print(p.show())
+
+    # Add an ipv4 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.3", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLBv3(tick=10, slotselect=10, portselect=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
+def generate_lb0_ipv6_v3(w):
+    for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
+        flags = []
+        if offset == 0:
+            # first segment
+            flags.append("first")
+        if offset + EVIO6_SEG_SIZE > EVIO6_BLOB_SIZE:
+            # last (possibly short) segment
+            flags.append("last")
+
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLBv3(tick=20, slotselect=20, portselect=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        w.write(p)
+        #print(p.show())
+
+    # Add an ipv6 packet from a not-allowed sender for lb_id 0 but *is* allowed for ld_id 1 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed:02aa:bbff:fecc:ddee", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLBv3(tick=20, slotselect=20, portselect=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
+def generate_lb1_misc(w):
     p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.10")/ICMP(type=8, id=39, seq=100) / (b"payload goes here")
     w.write(p)
 
@@ -98,6 +143,7 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
     p = Ether(dst="33:33:ff:00:00:01", src="00:11:22:33:44:55") / IPv6(dst="ff02::1:ff00:0001", src="::")/ICMPv6ND_NS(tgt="fd9f:53b7:a261:48ed::1")
     w.write(p)
 
+def generate_lb1_ipv4_v2(w):
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -107,13 +153,14 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
             # last (possibly short) segment
             flags.append("last")
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLBv2(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
 
     # Add an ipv4 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
-    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLB(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLBv2(tick=10, entropy=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
 
+def generate_lb1_ipv6_v2(w):
     for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
         flags = []
         if offset == 0:
@@ -123,9 +170,63 @@ with scapy.utils.PcapWriter('packets_in.pcap') as w:
             # last (possibly short) segment
             flags.append("last")
 
-        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLBv2(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
         w.write(p)
         #print(p.show())
 
     # Add an ipv6 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
-    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLB(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLBv2(tick=20, entropy=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
+def generate_lb1_ipv4_v3(w):
+    for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
+        flags = []
+        if offset == 0:
+            # first segment
+            flags.append("first")
+        if offset + EVIO6_SEG_SIZE > EVIO6_BLOB_SIZE:
+            # last (possibly short) segment
+            flags.append("last")
+
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.10")/UDP(sport=50000,dport=0x4c42)/UDPLBv3(tick=10, slotselect=10, portselect=1)/EVIO6Seg(rocid=0xabc, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        w.write(p)
+        #print(p.show())
+
+    # Add an ipv4 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:11:22:33:44:55")/IP(dst="10.1.2.4", src="10.1.2.2")/UDP(sport=50000,dport=0x4c42)/UDPLBv3(tick=10, slotselect=10, portselect=1)/EVIO6Seg(rocid=0xabc, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
+def generate_lb1_ipv6_v3(w):
+    for offset in range(0, EVIO6_BLOB_SIZE, EVIO6_SEG_SIZE):
+        flags = []
+        if offset == 0:
+            # first segment
+            flags.append("first")
+        if offset + EVIO6_SEG_SIZE > EVIO6_BLOB_SIZE:
+            # last (possibly short) segment
+            flags.append("last")
+
+        p = Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::10")/UDP(sport=12345,dport=0x4c42)/UDPLBv3(tick=20, slotselect=20, portselect=9)/EVIO6Seg(rocid=0x123, flags=flags, offset=offset)/Raw(load=evio6_blob[offset:offset+EVIO6_SEG_SIZE])
+        w.write(p)
+        #print(p.show())
+
+    # Add an ipv6 packet from a not-allowed sender for lb_id 1 but *is* allowed for lb_id 0 -> should be dropped
+    w.write(Ether(dst="00:aa:bb:cc:dd:ee", src="00:01:02:03:04:05")/IPv6(dst="fd9f:53b7:a261:48ed::1", src="fe80::1")/UDP(sport=12345,dport=0x4c42)/UDPLBv3(tick=20, slotselect=20, portselect=9)/EVIO6Seg(rocid=0x123, flags=["first"], offset=0)/Raw(load=evio6_blob[0:0+EVIO6_SEG_SIZE]))
+
+with scapy.utils.PcapWriter('packets_in.pcap') as w:
+    #
+    # Test packets for lb_id=0
+    #
+    generate_lb0_misc(w)
+    generate_lb0_ipv4_v2(w)
+    generate_lb0_ipv6_v2(w)
+    generate_lb0_ipv4_v3(w)
+    generate_lb0_ipv6_v3(w)
+
+    #
+    # Test packets for lb_id=1
+    #
+    generate_lb1_misc(w)
+    generate_lb1_ipv4_v2(w)
+    generate_lb1_ipv6_v2(w)
+    generate_lb1_ipv4_v3(w)
+    generate_lb1_ipv6_v3(w)
+
