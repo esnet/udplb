@@ -33,7 +33,7 @@ LB0 ICMPv4 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=payload goes here
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -63,7 +63,7 @@ LB0 ICMPv6Echo Test
     ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6EchoRequest  data=abcdef
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -91,7 +91,7 @@ LB0 ARP Test
     ${pkt}  Packet Extend  ${pkt}  Packet ARP  op=${1}  psrc=10.1.2.2  pdst=${LB0_UCAST_IPV4}
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -124,7 +124,7 @@ LB0 ICMPv6ND_NS Unicast Source Test
     ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6NDOptSrcLLAddr  lladdr=00:11:22:33:44:aa
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -165,7 +165,7 @@ LB0 ICMPv6ND_NS Unspecified Source Test
     ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6ND_NS  tgt=${LB0_UCAST_IPV6}
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -199,7 +199,7 @@ TCP IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -224,7 +224,7 @@ TCP IPv6 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -250,7 +250,7 @@ Default UDP Port No LB Header IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -276,7 +276,7 @@ Default UDP Port No LB Header IPv6 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -302,7 +302,7 @@ Low Invalid UDP Port UDPLBv2 IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -328,7 +328,7 @@ High Invalid UDP Port UDPLBv2 IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -354,7 +354,7 @@ Invalid UDPLB version IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -380,7 +380,7 @@ LB0 Default UDP Port UDPLBv2 IPv4 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -423,7 +423,7 @@ LB0 Min UDP Port UDPLBv2 IPv4 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -466,7 +466,7 @@ LB0 Max UDP Port UDPLBv2 IPv4 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -509,7 +509,7 @@ LB0 Default UDP Port UDPLBv2 IPv6 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -561,7 +561,7 @@ LB0 Random UDP Ports UDPLBv3 IPv6 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -613,7 +613,7 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -665,7 +665,7 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv4 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -692,7 +692,7 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv6 Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -719,7 +719,7 @@ LB0 UDPLBv3 Epoch Assign Miss Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -755,7 +755,7 @@ LB0 UDPLBv3 LB Calendar Miss Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
@@ -791,7 +791,7 @@ LB0 UDPLBv3 Member Info Miss Drop Test
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}
 
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  @{packets_in}
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
 
