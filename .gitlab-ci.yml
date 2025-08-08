@@ -37,7 +37,11 @@ p4bm:
   script:
     - apt update -y
     - apt install -y python3-setuptools
+
+    # Override the version of scapy in the base image so we can use a newer version in CI
+    - apt remove -y --purge python3-scapy
     - pip3 install scapy
+
     - pip3 install robotframework
     - make -s -C p4 compile
     - |
@@ -66,6 +70,10 @@ sim_app_tests:
   tags:
     - ht-sim
   script:
+    # Override the version of scapy in the base image so we can use a newer version in CI
+    - apt remove -y --purge python3-scapy
+    - pip3 install scapy
+
     - make -s config
     - make -s -C tests/regression
     - grep 'PASSED.*suites passing' tests/regression/run_$SEED/sim.log
