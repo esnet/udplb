@@ -1,5 +1,9 @@
 # Install System Prerequisites
 
+Note: Vivado and VitisNet P4 are build tools that are required to
+compile udplb. You will need to separately download Vivado and
+VitisNet P4 in order to work with this software.
+
 ```
 sudo pip3 install scapy
 sudo apt install tshark
@@ -53,3 +57,18 @@ tshark -r packets_in.pcap -O udplb,evio6seg
 capinfos packets_out.pcap
 tshark -r packets_out.pcap -O ip,ipv6,udp,udplb,evio6seg -o ip.check_checksum:TRUE -o udp.check_checksum:TRUE
 ```
+
+# Copyright Notice
+
+ESnet-JLab FPGA Accelerated Transport (data plane) [EJFAT (udplb)] Copyright (c) 2025, Malleable Networks Inc, Apical Networks Inc, and 12574861 Canada Inc. All rights reserved.
+
+If you have questions about your rights to use or distribute this software,
+please contact Berkeley Lab's Intellectual Property Office at
+IPO@lbl.gov.
+
+NOTICE.  This Software was developed under funding from the U.S. Department
+of Energy and the U.S. Government consequently retains certain rights.  As
+such, the U.S. Government has been granted for itself and others acting on
+its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
+Software to reproduce, distribute copies to the public, prepare derivative 
+works, and perform publicly and display publicly, and to permit others to do so.
