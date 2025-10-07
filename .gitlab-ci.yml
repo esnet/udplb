@@ -15,7 +15,7 @@ variables:
   GIT_STRATEGY: clone
   SEED: 0
   RANDOMIZE_SEED: 0
-  SN_HW_APP_NAME: udplb
+  SN_HW_APP_NAME: ejfat
 
 .common:
   image: $CI_REGISTRY/ht/xilinx-tools-docker:77364-g0c199152
