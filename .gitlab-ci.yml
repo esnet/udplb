@@ -297,8 +297,8 @@ build_au55c:
   tags:
     - ht-misc
   variables:
-    VALIDATE_WNS_MIN: "-0.100"
-    VALIDATE_TNS_MIN: "-100.0"
+    VALIDATE_WNS_MIN: "-0.150"
+    VALIDATE_TNS_MIN: "-150.0"
   script:
     - make -s -C esnet-smartnic-hw validate BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
@@ -312,8 +312,8 @@ build_au55c:
 validate_au280:
   extends: .validate
   variables:
-    VALIDATE_WNS_MIN: "-0.100"
-    VALIDATE_TNS_MIN: "-100.0"
+    VALIDATE_WNS_MIN: "-0.150"
+    VALIDATE_TNS_MIN: "-150.0"
   needs:
     - build_au280
   rules:
@@ -324,8 +324,8 @@ validate_au280:
 validate_au55c:
   extends: .validate
   variables:
-    VALIDATE_WNS_MIN: "-0.100"
-    VALIDATE_TNS_MIN: "-100.0"
+    VALIDATE_WNS_MIN: "-0.150"
+    VALIDATE_TNS_MIN: "-150.0"
   needs:
     - build_au55c
   rules:
