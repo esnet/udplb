@@ -269,7 +269,7 @@ smartnic_ip_au55c:
       dotenv:
         bitfile.env
     expire_in: 2 weeks
-  timeout: 9h
+  timeout: 11h
 
 build_au280:
   extends: .bitfile
