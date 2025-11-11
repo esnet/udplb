@@ -1183,8 +1183,17 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    hdr.udp.totalLen = hdr.udp.totalLen - SIZEOF_UDPLB_HDR;
 	}
 
-	// Write the updated checksum back into the packet
-	cksum_update_header(hdr.udp.checksum, udplb_ckd);
+	// Do not update the udp checksum if the incoming value is zero (ie. no checksum computed at transmitter)
+	if (hdr.udp.checksum != 16w0) {
+	    // Original packet contained a supplied checksum, write back the updated checksum into the packet
+	    cksum_update_header(hdr.udp.checksum, udplb_ckd);
+
+	    // If the final checksum is computed to be zero, it must be inverted
+	    // Ref: https://www.rfc-editor.org/rfc/rfc768.html
+	    if (hdr.udp.checksum == 16w0) {
+		hdr.udp.checksum = 16w0xffff;
+	    }
+	}
 
 	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
 	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
