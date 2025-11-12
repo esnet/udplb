@@ -258,6 +258,7 @@ smartnic_ip_au55c:
     - make -s -C esnet-smartnic-hw/src refresh
     - rm -rf .app/out/smartnic && cp -pr esnet-smartnic-hw/.out .app/out/smartnic 2>/dev/null && echo "Using pre-generated IP." || echo "No pre-generated IP available."
     - make -s build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
+    - make -s -C esnet-smartnic-hw prune_build BOARD=$SN_HW_BOARD BUILD_NAME=open-nic-ci
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
