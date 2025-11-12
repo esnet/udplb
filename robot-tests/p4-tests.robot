@@ -654,6 +654,93 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     Packet Field Equal  ${pkt}  UDPLBv3  tick  ${16}
     Packet Field Equal  ${pkt}  Raw  load  ${{b'some payload'}}
 
+LB0 Checksum Sweep UDPLBv2 IPv4 Test
+    [Documentation]
+
+    [Tags]  robot:skip
+
+    ${packets_in}  Create List
+
+    FOR  ${sport}  IN RANGE  ${0}  ${65536}
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${sport}  dport=${LB_UDP_DST_PORT_DEFAULT}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+    END
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.rx_rslt_counter  13
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_ctx_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_mbr_info_miss_pkt_counter  0
+
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_ctx_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_rx_v3_counter  0
+
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_mbr_tx_pkt_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    #Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  ${65536}
+
+LB0 Checksum Sweep UDPLBv3 IPv6 Test
+    [Documentation]
+    # Note: in UDPLBv3, the tick field is no longer used for slot selection and that the slotselect field is now used for that
+    #       ensure that this test verifies the independence of those two fields (tick/slotselect) by making them different
+    [Tags]  robot:skip
+
+    ${packets_in}  Create List
+
+    FOR  ${sport}  IN RANGE  ${0}  ${65536}
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB0_ALLOWED_SRC_IPV6}  dst=${LB0_UCAST_IPV6}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${sport}  dport=${19522}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${3}  slotselect=${10}  portselect=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+    END
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.rx_rslt_counter  13
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_ctx_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_mbr_info_miss_pkt_counter  0
+
+    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_rx_v2_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_ctx_rx_v3_counter  0
+
+    P4 Counter Packets Equal  65536  MatchActionImpl.lb_mbr_tx_pkt_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    #Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  ${65536}
+
 LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv4 Drop Test
     [Documentation]
     ${packets_in}  Create List
