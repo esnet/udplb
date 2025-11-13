@@ -5,7 +5,7 @@ compile udplb. You will need to separately download Vivado and
 VitisNet P4 in order to work with this software.
 
 ```
-sudo pip3 install scapy
+sudo pip3 install scapy robotframework
 sudo apt install tshark
 ```
 
@@ -24,38 +24,67 @@ The awkward concatenaton of the two dissectors is to fix the non-deterministic o
 source /tools/Xilinx/Vivado/2023.2/settings64.sh
 ```
 
-# Simulate the P4 pipeline
+# Use robot and the p4bm behavioural model to simulate the p4 pipeline
 
-**Note**: All simulation instructions are relative to the `sim` subdirectory.
+**Note**: All instructions in this section are relative to the root of the git repo.
+
+Compile the p4 program to
+ - use the p4c-vitisnet to compile your p4 program into the IR (`udplb.json`) required by the p4bm simulator
 
 ```
-make sim
+make -s -C p4 compile
 ```
 
-This takes care of all of these steps for you:
-  - generate a set of simulation input packets (`packets_in.pcap`)
-  - compile (using p4c-vitisnetp4) your p4 program into the IR (`p4-udplb.json`) required by the simulator
-  - run the p4 behavioural model controlled by a script (`runsim.txt`) which will
-    - preload pipleine table entries
-	- read input packets (`packets_in.pcap`) and metadata (`packets_in.meta`)
-	- run your p4 program on each packet
-  - captures output packets (`packets_out.pcap`) and metadata (`packets_out.meta`)
-  - captures output log files (`log_cli.txt` and `log_model.txt`)
+Run the robot test suite to
+ - run the p4 behavioural model (p4bm)
+ - configure p4 tables
+ - generate and inject packets into the p4bm simulator
+ - validate the internal p4 pipeline state after each test
+ - capture and validate any output packets produced by each test
+```
+robot \
+  --variable P4_HW_ENV:p4bm-sim \
+  --pythonpath=esnet-smartnic-hw/test/library/p4_robot_p4bm \
+  --pythonpath=esnet-smartnic-hw/test/library/p4_robot \
+  --pythonpath=esnet-smartnic-hw/test/library/packet_robot \
+  --pythonpath=robot-tests/library/lb_robot \
+  --pythonpath=robot-tests/library/packet_lb_robot \
+  -d robot-output/ \
+  robot-tests/p4-tests.robot
+```
 
-## Displaying the simulation input packets (optional)
+The test results are stored under the `robot-output` directory.  A test-specific directory under that tree contains the input and output packets and metadata produced by the test.
+
+## Displaying the simulation input and output packets (optional)
 
 You can display information about the simulated input packets using `capinfos` and `tshark`.
 
-```
-capinfos packets_in.pcap
-tshark -r packets_in.pcap -O udplb,evio6seg
+Input packets
+``` bash
+export TEST_NAME="LB0_Random_UDP_Ports_UDPLBv3_IPv6_Test"
+
+capinfos robot-output/${TEST_NAME}/packets_in.pcap
+
+tshark \
+  -X lua_script:protocols/ejfat-stack.lua \
+  -r robot-output/${TEST_NAME}/packets_in.pcap \
+  -o 'udp.check_checksum:True' \
+  -o 'ip.check_checksum:True' \
+  -O ejfatlb,ejfatlbv2,ejfatlbv3,e2sarseg
 ```
 
-## Display the output packets (optional)
+Output packets
+``` bash
+export TEST_NAME="LB0_Random_UDP_Ports_UDPLBv3_IPv6_Test"
 
-```
-capinfos packets_out.pcap
-tshark -r packets_out.pcap -O ip,ipv6,udp,udplb,evio6seg -o ip.check_checksum:TRUE -o udp.check_checksum:TRUE
+capinfos robot-output/${TEST_NAME}/packets_out.pcap
+
+tshark \
+  -X lua_script:protocols/ejfat-stack.lua \
+  -r robot-output/${TEST_NAME}/packets_out.pcap \
+  -o 'udp.check_checksum:True' \
+  -o 'ip.check_checksum:True' \
+  -O ejfatlb,ejfatlbv2,ejfatlbv3,e2sarseg
 ```
 
 # Copyright Notice
