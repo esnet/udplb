@@ -9,14 +9,12 @@ sudo pip3 install scapy robotframework
 sudo apt install tshark
 ```
 
-# Install wireshark/tshark dissectors for udp-lb and evio6-seg protocol headers
+# Install wireshark/tshark dissectors for the EJFAT protocol stack
 
 ```
 mkdir -p ~/.local/lib/wireshark/plugins
-cat protocols/{udp-lb,evio6-seg}.lua > ~/.local/lib/wireshark/plugins/jlab-stack.lua
+cp protocols/ejfat-stack.lua ~/.local/lib/wireshark/plugins/
 ```
-
-The awkward concatenaton of the two dissectors is to fix the non-deterministic order that wireshark/tshark uses to load plugins.
 
 # Set up the vivado tools environment
 
