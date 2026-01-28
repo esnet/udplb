@@ -215,64 +215,64 @@ error {
 
 #if (CKSUM_MODE == CKSUM_MODE_USE_MACROS)
 #define cksum_init(cksum, init_val) \
-bit<16> cksum = init_val;
+bit<16> cksum = init_val
 
 #define cksum_update_header(h, cksum_delta) \
 h = h ^ 0xffff; \
 cksum_add_bit16(h, cksum_delta); \
-h = h ^ 0xffff;
+h = h ^ 0xffff
 
 #define cksum_swap_bit16(cksum, old, new) \
 cksum_sub_bit16(cksum, old); \
-cksum_add_bit16(cksum, new);
+cksum_add_bit16(cksum, new)
 
 #define cksum_add_bit32(cksum, v) \
 cksum_add_bit16(cksum, v[31:16]); \
-cksum_add_bit16(cksum, v[15:00]);
+cksum_add_bit16(cksum, v[15:00])
 
 #define cksum_sub_bit32(cksum, v) \
 cksum_sub_bit16(cksum, v[31:16]); \
-cksum_sub_bit16(cksum, v[15:00]);
+cksum_sub_bit16(cksum, v[15:00])
 
 #define cksum_swap_bit32(cksum, old, new) \
 cksum_sub_bit32(cksum, old); \
-cksum_add_bit32(cksum, new);
+cksum_add_bit32(cksum, new)
 
 #define cksum_add_bit48(cksum, v) \
 cksum_add_bit16(cksum, v[47:32]); \
-cksum_add_bit32(cksum, v[31:00]);
+cksum_add_bit32(cksum, v[31:00])
 
 #define cksum_sub_bit48(cksum, v) \
 cksum_sub_bit16(cksum, v[47:32]); \
-cksum_sub_bit32(cksum, v[31:00]);
+cksum_sub_bit32(cksum, v[31:00])
 
 #define cksum_swap_bit48(cksum, old, new) \
 cksum_sub_bit48(cksum, old); \
-cksum_add_bit48(cksum, new);
+cksum_add_bit48(cksum, new)
 
 #define cksum_add_bit64(cksum, v) \
 cksum_add_bit32(cksum, v[63:32]); \
-cksum_add_bit32(cksum, v[31:00]);
+cksum_add_bit32(cksum, v[31:00])
 
 #define cksum_sub_bit64(cksum, v) \
 cksum_sub_bit32(cksum, v[63:32]); \
-cksum_sub_bit32(cksum, v[31:00]);
+cksum_sub_bit32(cksum, v[31:00])
 
 #define cksum_swap_bit64(cksum, old, new) \
 cksum_sub_bit64(cksum, old); \
-cksum_add_bit64(cksum, new);
+cksum_add_bit64(cksum, new)
 
 #define cksum_add_bit128(cksum, v) \
 cksum_add_bit64(cksum, v[127:64]); \
-cksum_add_bit64(cksum, v[63:0]);
+cksum_add_bit64(cksum, v[63:0])
 
 #define cksum_sub_bit128(cksum, v) \
 cksum_sub_bit64(cksum, v[127:64]); \
-cksum_sub_bit64(cksum, v[63:0]);
+cksum_sub_bit64(cksum, v[63:0])
 
 #define cksum_swap_bit128(cksum, old, new) \
 cksum_sub_bit128(cksum, old); \
-cksum_add_bit128(cksum, new);
+cksum_add_bit128(cksum, new)
 
 #define cksum_final(cksum) \
 cksum
