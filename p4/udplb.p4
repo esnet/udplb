@@ -3,8 +3,6 @@
 
 // Decide if we want a checksum implementation that uses actions or uses macros
 #define CKSUM_MODE_USE_MACROS  1
-#define CKSUM_MODE_USE_ACTIONS 2
-#define CKSUM_MODE_OMITTED     3
 
 #define CKSUM_MODE CKSUM_MODE_USE_MACROS
 
@@ -215,25 +213,7 @@ error {
     InvalidUDPLBmagic
 }
 
-#if (CKSUM_MODE == CKSUM_MODE_OMITTED)
-#define cksum_update_header(h, cksum_delta) ;
-#define cksum_add_bit16(cksum, v) ;
-#define cksum_sub_bit16(cksum, v) ;
-#define cksum_swap_bit16(cksum, old, new) ;
-#define cksum_add_bit32(cksum, v) ;
-#define cksum_sub_bit32(cksum, v) ;
-#define cksum_swap_bit32(cksum, old, new) ;
-#define cksum_add_bit48(cksum, v) ;
-#define cksum_sub_bit48(cksum, v) ;
-#define cksum_swap_bit48(cksum, old, new) ;
-#define cksum_add_bit64(cksum, v) ;
-#define cksum_sub_bit64(cksum, v) ;
-#define cksum_swap_bit64(cksum, old, new) ;
-#define cksum_add_bit128(cksum, v) ;
-#define cksum_sub_bit128(cksum, v) ;
-#define cksum_swap_bit128(cksum, old, new) ;
-
-#elif (CKSUM_MODE == CKSUM_MODE_USE_MACROS)
+#if (CKSUM_MODE == CKSUM_MODE_USE_MACROS)
 #define cksum_update_header(h, cksum_delta) \
 h = h ^ 0xffff; \
 cksum_add_bit16(h, cksum_delta); \
@@ -656,7 +636,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	default_action = drop;
     }
 
-#if (CKSUM_MODE != CKSUM_MODE_OMITTED)
+#if (CKSUM_MODE == CKSUM_MODE_USE_MACROS)
     // Checksum ops for bit<16>
     action cksum_sub_bit16(inout bit<16> cksum, in bit<16> v) {
 	bit<18> sum = 2w00 ++ cksum;
@@ -672,84 +652,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	
 	sum = sum + v_x;
 	cksum = sum[15:0] + (15w00 ++ sum[16:16]);
-    }
-#endif // CKSUM_MODE
-
-#if (CKSUM_MODE == CKSUM_MODE_USE_ACTIONS)
-    action cksum_swap_bit16(inout bit<16> cksum, in bit<16> old, in bit<16> new) {
-	cksum_sub_bit16(cksum, old);
-	cksum_add_bit16(cksum, new);
-    }
-
-    // Checksum ops for bit<32>
-    action cksum_sub_bit32(inout bit<16> cksum, in bit<32> v) {
-	cksum_sub_bit16(cksum, v[31:16]);
-	cksum_sub_bit16(cksum, v[15:00]);
-    }
-
-    action cksum_add_bit32(inout bit<16> cksum, in bit<32> v) {
-	cksum_add_bit16(cksum, v[31:16]);
-	cksum_add_bit16(cksum, v[15:00]);
-    }
-
-    action cksum_swap_bit32(inout bit<16> cksum, in bit<32> old, in bit<32> new) {
-	cksum_sub_bit32(cksum, old);
-	cksum_add_bit32(cksum, new);
-    }
-
-    // Checksum ops for bit<48>
-    action cksum_sub_bit48(inout bit<16> cksum, in bit<48> v) {
-	cksum_sub_bit16(cksum, v[47:32]);
-	cksum_sub_bit32(cksum, v[31:00]);
-    }
-
-    action cksum_add_bit48(inout bit<16> cksum, in bit<48> v) {
-	cksum_add_bit16(cksum, v[47:32]);
-	cksum_add_bit32(cksum, v[31:00]);
-    }
-
-    action cksum_swap_bit48(inout bit<16> cksum, in bit<48> old, in bit<48> new) {
-	cksum_sub_bit48(cksum, old);
-	cksum_add_bit48(cksum, new);
-    }
-
-    // Checksum ops for bit<64>
-    action cksum_sub_bit64(inout bit<16> cksum, in bit<64> v) {
-	cksum_sub_bit32(cksum, v[63:32]);
-	cksum_sub_bit32(cksum, v[31:00]);
-    }
-
-    action cksum_add_bit64(inout bit<16> cksum, in bit<64> v) {
-	cksum_add_bit32(cksum, v[63:32]);
-	cksum_add_bit32(cksum, v[31:00]);
-    }
-
-    action cksum_swap_bit64(inout bit<16> cksum, in bit<64> old, in bit<64> new) {
-	cksum_sub_bit64(cksum, old);
-	cksum_add_bit64(cksum, new);
-    }
-
-    // Checksum ops for bit<128>
-    action cksum_sub_bit128(inout bit<16> cksum, in bit<128> v) {
-	cksum_sub_bit64(cksum, v[127:64]);
-	cksum_sub_bit64(cksum, v[63:00]);
-    }
-
-    action cksum_add_bit128(inout bit<16> cksum, in bit<128> v) {
-	cksum_add_bit64(cksum, v[127:64]);
-	cksum_add_bit64(cksum, v[63:00]);
-    }
-
-    action cksum_swap_bit128(inout bit<16> cksum, in bit<128> old, in bit<128> new) {
-	cksum_sub_bit128(cksum, old);
-	cksum_add_bit128(cksum, new);
-    }
-
-    // Apply an accumulated delta to a header field
-    action cksum_update_header(inout bit<16> header_field, in bit<16> cksum_delta) {
-	header_field = header_field ^ 0xFFFF;
-	cksum_add_bit16(header_field, cksum_delta);
-	header_field = header_field ^ 0xFFFF;
     }
 #endif // CKSUM_MODE
 
