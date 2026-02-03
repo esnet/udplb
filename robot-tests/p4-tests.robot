@@ -53,6 +53,7 @@ LB0 ICMPv4 Test
     Packet Field Equal  ${pkt}  IP  src  ${LB0_UCAST_IPV4}
     Packet Field Equal  ${pkt}  ICMP  type  ${0}
     Packet Field Equal  ${pkt}  Raw  load  ${{b'payload goes here'}}
+    Packet Checksums Ok  ${pkt}
 
 LB0 ICMPv6Echo Test
     [Documentation]
@@ -82,6 +83,7 @@ LB0 ICMPv6Echo Test
     Packet Field Equal  ${pkt}  IPv6  dst  fe80::1
     Packet Field Equal  ${pkt}  IPv6  src  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  ICMPv6EchoReply  data  ${{b'abcdef'}}
+    Packet Checksums Ok  ${pkt}
 
 LB0 ARP Test
     [Documentation]
@@ -147,6 +149,7 @@ LB0 ICMPv6ND_NS Unicast Source Test
     Packet Field Equal  ${pkt}  ICMPv6ND_NA  S  ${1}
     Packet Field Equal  ${pkt}  ICMPv6ND_NA  tgt  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  ICMPv6NDOptDstLLAddr  lladdr  ${LB_UCAST_MAC}
+    Packet Checksums Ok  ${pkt}
 
 LB0 ICMPv6ND_NS Unspecified Source Test
     [Documentation]
@@ -188,6 +191,7 @@ LB0 ICMPv6ND_NS Unspecified Source Test
     Packet Field Equal  ${pkt}  ICMPv6ND_NA  S  ${0}
     Packet Field Equal  ${pkt}  ICMPv6ND_NA  tgt  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  ICMPv6NDOptDstLLAddr  lladdr  ${LB_UCAST_MAC}
+    Packet Checksums Ok  ${pkt}
 
 TCP IPv4 Drop Test
     [Documentation]
@@ -411,6 +415,7 @@ LB0 Default UDP Port UDPLBv2 IPv4 Test
     Packet Field Equal  ${pkt}  IP  src  ${LB0_UCAST_IPV4}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
+    Packet Checksums Ok  ${pkt}
 
 LB0 Min UDP Port UDPLBv2 IPv4 Test
     [Documentation]
@@ -454,6 +459,7 @@ LB0 Min UDP Port UDPLBv2 IPv4 Test
     Packet Field Equal  ${pkt}  IP  src  ${LB0_UCAST_IPV4}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
+    Packet Checksums Ok  ${pkt}
 
 LB0 Max UDP Port UDPLBv2 IPv4 Test
     [Documentation]
@@ -497,6 +503,7 @@ LB0 Max UDP Port UDPLBv2 IPv4 Test
     Packet Field Equal  ${pkt}  IP  src  ${LB0_UCAST_IPV4}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
+    Packet Checksums Ok  ${pkt}
 
 LB0 Default UDP Port UDPLBv2 IPv6 Test
     [Documentation]
@@ -543,6 +550,7 @@ LB0 Default UDP Port UDPLBv2 IPv6 Test
     Packet Field Equal  ${pkt}  IPv6  src  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
+    Packet Checksums Ok  ${pkt}
 
 LB0 Random UDP Ports UDPLBv3 IPv6 Test
     [Documentation]
@@ -595,6 +603,7 @@ LB0 Random UDP Ports UDPLBv3 IPv6 Test
     Packet Field Equal  ${pkt}  IPv6  src  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
+    Packet Checksums Ok  ${pkt}
 
 LB1 Random UDP Port UDPLBv3 IPv6 Test
     [Documentation]
@@ -653,6 +662,7 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     Packet Field Equal  ${pkt}  UDPLBv3  portselect  ${1}
     Packet Field Equal  ${pkt}  UDPLBv3  tick  ${16}
     Packet Field Equal  ${pkt}  Raw  load  ${{b'some payload'}}
+    Packet Checksums Ok  ${pkt}
 
 LB0 Checksum Sweep UDPLBv2 IPv4 Test
     [Documentation]
@@ -697,6 +707,10 @@ LB0 Checksum Sweep UDPLBv2 IPv4 Test
 
     Length Should Be  ${packets_out}  ${65536}
 
+    FOR  ${pkt}  IN  @{packets_out}
+    Run Keyword and Continue on Failure  Packet Checksums Ok  ${pkt}
+    END
+
 LB0 Checksum Sweep UDPLBv3 IPv6 Test
     [Documentation]
     # Note: in UDPLBv3, the tick field is no longer used for slot selection and that the slotselect field is now used for that
@@ -740,6 +754,10 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     #Packet Log Packets  ${packets_out}
 
     Length Should Be  ${packets_out}  ${65536}
+
+    FOR  ${pkt}  IN  @{packets_out}
+    Run Keyword and Continue on Failure  Packet Checksums Ok  ${pkt}
+    END
 
 LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv4 Drop Test
     [Documentation]
