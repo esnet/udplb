@@ -61,7 +61,7 @@ LB0 ICMPv6Echo Test
 
     ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
     ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=fe80::1  dst=${LB0_UCAST_IPV6}
-    ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6EchoRequest  data=abcdef
+    ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6EchoRequest  id=${3}  seq=${1}  data=abcdef
     Append To List  ${packets_in}  ${pkt}
 
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
