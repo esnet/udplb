@@ -1,10 +1,6 @@
 #include <core.p4>
 #include <xsa.p4>
 
-#define INCLUDE_ICMPV4ECHO 1
-#define INCLUDE_ICMPV6ECHO 1
-#define INCLUDE_IPV6ND 1
-#define INCLUDE_ARP 1
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -26,8 +22,6 @@ header ethernet_t {
     bit<16> etherType;
 }
 
-#if INCLUDE_ARP
-
 header arp_t {
     bit<16>  htype;
     bit<16>  ptype;
@@ -40,8 +34,6 @@ header arp_t {
     bit<32>  tpa;
 }
 
-#endif // INCLUDE_ARP
-
 header ipv6_t {
     bit<4>   version;
     bit<8>   trafficClass;
@@ -53,25 +45,16 @@ header ipv6_t {
     bit<128> dstAddr;
 }
 
-#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
-
 header icmpv6_common_t {
     bit<16>  msg_type_code;
     bit<16>  checksum;
 }
-
-#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
-
-#if INCLUDE_ICMPV6ECHO
 
 header icmpv6_echo_t {
     bit<16>  identifier;
     bit<16>  sequence;
 }
 
-#endif  // INCLUDE_ICMPV6ECHO
-
-#if INCLUDE_IPV6ND
 header ipv6nd_neigh_sol_t {
     bit<32>  rsvd;
     bit<128> target;
@@ -103,8 +86,6 @@ header ipv6nd_adv_option_lladdr_t {
     bit<48>  ethernet_addr;
 }
 
-#endif // INCLUDE_IPV6ND
-
 header ipv4_t {
     bit<4>  version;
     bit<4>  ihl;
@@ -124,7 +105,6 @@ header ipv4_opt_t {
     varbit<320> options; // IPv4 options - length = (ipv4.hdr_len - 5) * 32
 }
 
-#if INCLUDE_ICMPV4ECHO
 header icmpv4_common_t {
     bit<16> msg_type_code;
     bit<16> checksum;
@@ -134,7 +114,6 @@ header icmpv4_echo_t {
     bit<16>  identifier;
     bit<16>  sequence;
 }
-#endif  // INCLUDE_ICMPV4ECHO
 
 header udp_t {
     bit<16> srcPort;
@@ -164,23 +143,14 @@ header udplb_v3_t {
 
 struct headers {
     ethernet_t              ethernet;
-#if INCLUDE_ARP
     arp_t                   arp;
-#endif // INCLUDE_ARP
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
-#if INCLUDE_ICMPV4ECHO
     icmpv4_common_t         icmpv4_common;
     icmpv4_echo_t           icmpv4_echo;
-#endif  // INCLUDE_ICMPV4ECHO
     ipv6_t                  ipv6;
-#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
     icmpv6_common_t         icmpv6_common;
-#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
-#if INCLUDE_ICMPV6ECHO
     icmpv6_echo_t           icmpv6_echo;
-#endif  // INCLUDE_ICMPV6ECHO
-#if INCLUDE_IPV6ND
     ipv6nd_neigh_sol_t      ipv6nd_neigh_sol;
     ipv6nd_option_common_t  ipv6nd_option_common;
     ipv6nd_option_lladdr_t  ipv6nd_option_lladdr;
@@ -188,7 +158,6 @@ struct headers {
     ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
     ipv6nd_adv_option_common_t  ipv6nd_adv_option_common;
     ipv6nd_adv_option_lladdr_t  ipv6nd_adv_option_lladdr;
-#endif // INCLUDE_IPV6ND
     udp_t                   udp;
     udplb_common_t          udplb_common;
     udplb_v2_t              udplb_v2;
@@ -197,13 +166,11 @@ struct headers {
 
 // User-defined errors 
 error {
-#if INCLUDE_ARP
     UnhandledArpHType,
     UnhandledArpPType,
     UnhandledArpHLen,
     UnhandledArpPLen,
     UnhandledArpOper,
-#endif // INCLUDE_ARP
     InvalidIPpacket,
     InvalidUDPLBmagic
 }
@@ -243,14 +210,11 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
-#if INCLUDE_ARP
 	    16w0x0806: parse_arp;
-#endif // INCLUDE_ARP
             16w0x86dd: parse_ipv6;
         }
     }
 
-#if INCLUDE_ARP
     state parse_arp {
 	packet.extract(hdr.arp);
 	verify(hdr.arp.htype == 1, error.UnhandledArpHType);       // Ethernet
@@ -260,7 +224,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	verify(hdr.arp.oper == 1, error.UnhandledArpOper);         // Request
 	transition accept;
     }
-#endif // INCLUDE_ARP
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
@@ -276,35 +239,24 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
         packet.extract(hdr.ipv6);
         verify(hdr.ipv6.version == 6, error.InvalidIPpacket);
         transition select(hdr.ipv6.nextHdr) {
-#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 	    8w58: parse_icmpv6;
-#endif // INCLUDE_IPV6ND
             8w17: parse_udp;
         }
     }
 
-#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
 	transition select(hdr.icmpv6_common.msg_type_code) {
-#if INCLUDE_ICMPV6ECHO
 	    8w128 ++ 8w0: parse_icmpv6_echo;
-#endif  // INCLUDE_ICMPV6ECHO
-#if INCLUDE_IPV6ND
 	    8w135 ++ 8w0: parse_ipv6nd_neigh_sol;
-#endif  // INCLUDE_IPV6NS
 	}
     }
-#endif  // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
 
-#if INCLUDE_ICMPV6ECHO
     state parse_icmpv6_echo {
 	packet.extract(hdr.icmpv6_echo);
 	transition accept;
     }
-#endif  // INCLUDE_ICMPV6ECHO
 
-#if INCLUDE_IPV6ND
     state parse_ipv6nd_neigh_sol {
 	packet.extract(hdr.ipv6nd_neigh_sol);
 	transition select(hdr.ipv6.payloadLen) {
@@ -325,9 +277,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	packet.extract(hdr.ipv6nd_option_lladdr);
 	transition accept;
     }
-#endif // INCLUDE_IPV6ND
 
-#if INCLUDE_ICMPV4ECHO
     state parse_icmpv4 {
 	packet.extract(hdr.icmpv4_common);
 	transition select(hdr.icmpv4_common.msg_type_code) {
@@ -339,7 +289,6 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	packet.extract(hdr.icmpv4_echo);
 	transition accept;
     }
-#endif  // INCLUDE_ICMPV4ECHO
 
     state parse_udp {
         packet.extract(hdr.udp);
@@ -634,10 +583,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
 	} else if (hdr.ipv6.isValid()) {
 	    meta_ip_da = hdr.ipv6.dstAddr;
-#if INCLUDE_ARP
 	} else if (hdr.arp.isValid()) {
 	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
-#endif // INCLUDE_ARP
 	} else {
 	    rx_rslt_counter.count(rx_rslt_drop_not_ip);
 	    drop();
@@ -651,7 +598,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	}
 
 	if (false) {
-#if INCLUDE_ARP
 	// Handle ARP/ND requests
 	} else if (hdr.arp.isValid()) {
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
@@ -676,8 +622,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    rx_rslt_counter.count(rx_rslt_ok_arp_req);
 	    return;
-#endif // INCLUDE_ARP
-#if INCLUDE_ICMPV4ECHO
 	} else if (hdr.icmpv4_echo.isValid()) {
 	    cksum.clear();
 
@@ -705,8 +649,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    rx_rslt_counter.count(rx_rslt_ok_icmpv4_echo);
 	    return;
-#endif  // INCLUDE_ICMPV4ECHO
-#if INCLUDE_ICMPV6ECHO
         } else if (hdr.icmpv6_echo.isValid()) {
 	    cksum.clear();
 
@@ -736,8 +678,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    rx_rslt_counter.count(rx_rslt_ok_icmpv6_echo);
 	    return;
-#endif  // INCLUDE_ICMPV6ECHO
-#if INCLUDE_IPV6ND
 	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
 	    bit<128> new_ip_da;
 	    bit<48>  new_mac_da;
@@ -829,7 +769,6 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 
 	    rx_rslt_counter.count(rx_rslt_ok_ipv6nd_neigh_sol);
 	    return;
-#endif // INCLUDE_IPV6ND
 	}
 
 	// Packets making it this far are destined for the load balancer offload path
@@ -1056,29 +995,25 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
-#if INCLUDE_ARP
 	packet.emit(hdr.arp);
-#endif // INCLUDE_ARP
+
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv4_opt);
-#if INCLUDE_ICMPV4ECHO
+
 	packet.emit(hdr.icmpv4_common);
 	packet.emit(hdr.icmpv4_echo);
-#endif  // INCLUDE_ICMPV4ECHO
 
         packet.emit(hdr.ipv6);
-#if INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
+
 	packet.emit(hdr.icmpv6_common);
-#endif // INCLUDE_IPV6ND || INCLUDE_ICMPV6ECHO
-#if INCLUDE_ICMPV6ECHO
 	packet.emit(hdr.icmpv6_echo);
-#endif // INCLUDE_ICMPV6ECHO
-#if INCLUDE_IPV6ND
+
 	packet.emit(hdr.ipv6nd_neigh_adv);
 	packet.emit(hdr.ipv6nd_adv_option_common);
 	packet.emit(hdr.ipv6nd_adv_option_lladdr);
-#endif // INCLUDE_IPV6ND
+
         packet.emit(hdr.udp);
+
 	packet.emit(hdr.udplb_common);
 	packet.emit(hdr.udplb_v2);
 	packet.emit(hdr.udplb_v3);
