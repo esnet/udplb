@@ -692,12 +692,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 		24w0 ++ hdr.ipv6.nextHdr,
 		// ICMP common header fields
 		hdr.icmpv6_common,
-		// ICMP neighbour advertisement header
-		hdr.ipv6nd_neigh_adv,
-		// ICMP neighbour advertisement option common header fields
-		hdr.ipv6nd_adv_option_common,
-		// ICMP neighbour advertisement LLADDR header fields
-		hdr.ipv6nd_adv_option_lladdr
+		// ICMPv6 echo header
+		hdr.icmpv6_echo
 	    });
 	    l4_cksum.get(hdr.icmpv6_common.checksum);
 
