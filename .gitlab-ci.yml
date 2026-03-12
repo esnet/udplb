@@ -262,6 +262,7 @@ smartnic_ip_au55c:
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
+      - esnet-smartnic-hw/.out
       - .app
       - artifacts
       - esnet-smartnic-hw/open-nic-shell/build
