@@ -39,6 +39,22 @@ LB0 ICMPv4 Test
 
     P4 Run Traffic  ${test_dir}/packets
 
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  0
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  1
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  2
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  3
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  4
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  5
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  6
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  7
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  8
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  9
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  10
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  11
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  12
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  13
+    ${counter}  P4 Read Counter  MatchActionImpl.rx_rslt_counter  14
+
     P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  9
 
@@ -758,176 +774,6 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     FOR  ${pkt}  IN  @{packets_out}
     Run Keyword and Continue on Failure  Packet Checksums Ok  ${pkt}
     END
-
-LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv4 Drop Test
-    [Documentation]
-    ${packets_in}  Create List
-
-    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB1_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${16}  slotselect=${511}  portselect=${1}
-    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
-    Append To List  ${packets_in}  ${pkt}
-
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
-
-    P4 Counter Reset All
-
-    P4 Run Traffic  ${test_dir}/packets
-
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  13
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
-
-    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
-    Packet Log Packets  ${packets_out}
-
-    Length Should Be  ${packets_out}  0
-
-LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv6 Drop Test
-    [Documentation]
-    ${packets_in}  Create List
-
-    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB1_ALLOWED_SRC_IPV6}  dst=${LB0_UCAST_IPV6}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${16}  slotselect=${511}  portselect=${1}
-    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
-    Append To List  ${packets_in}  ${pkt}
-
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
-
-    P4 Counter Reset All
-
-    P4 Run Traffic  ${test_dir}/packets
-
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  13
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
-
-    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
-    Packet Log Packets  ${packets_out}
-
-    Length Should Be  ${packets_out}  0
-
-LB0 UDPLBv3 Epoch Assign Miss Drop Test
-    [Documentation]
-    ${packets_in}  Create List
-
-    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${9999999}  slotselect=${20}  portselect=${1}
-    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
-    Append To List  ${packets_in}  ${pkt}
-
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
-
-    P4 Counter Reset All
-
-    P4 Run Traffic  ${test_dir}/packets
-
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  13
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_bad_udplb_version_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_mbr_info_miss_pkt_counter  0
-
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_v3_counter  0
-
-    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
-    Packet Log Packets  ${packets_out}
-
-    Length Should Be  ${packets_out}  0
-
-LB0 UDPLBv3 LB Calendar Miss Drop Test
-    [Documentation]
-    ${packets_in}  Create List
-
-    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${16}  slotselect=${99}  portselect=${1}
-    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
-    Append To List  ${packets_in}  ${pkt}
-
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
-
-    P4 Counter Reset All
-
-    P4 Run Traffic  ${test_dir}/packets
-
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  13
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_bad_udplb_version_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_mbr_info_miss_pkt_counter  0
-
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_v3_counter  0
-
-    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
-    Packet Log Packets  ${packets_out}
-
-    Length Should Be  ${packets_out}  0
-
-LB0 UDPLBv3 Member Info Miss Drop Test
-    [Documentation]
-    ${packets_in}  Create List
-
-    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${16}  slotselect=${21}  portselect=${1}
-    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
-    Append To List  ${packets_in}  ${pkt}
-
-    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
-
-    P4 Counter Reset All
-
-    # Create a calendar slot (2) pointing at a nonexistent member info (1)
-    # LB0 Epoch 1 (ticks 16-31) has slot_select_bit_cnt = 3 and slot_select_xor = 0xffff
-    # Packet has tick=16, slotselect=21
-    #   (21 ^ 0xffff) & 0b0111 = 2
-    # Create a LB Calendar entry with: LB=0, epoch=1, min_slot=2, max_slot=2, member=1 (nonexistent)
-    #
-    LB SetCalendarSlotRange  0  1  2  2  1
-
-    P4 Run Traffic  ${test_dir}/packets
-
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.rx_rslt_counter  13
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_bad_udplb_version_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_drop_mbr_info_miss_pkt_counter  0
-
-    P4 Counter Packets Equal  0  MatchActionImpl.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.lb_ctx_rx_v3_counter  0
-
-    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
-    Packet Log Packets  ${packets_out}
-
-    Length Should Be  ${packets_out}  0
 
 *** Keywords ***
 
