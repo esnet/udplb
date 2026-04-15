@@ -539,10 +539,41 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	default_action = drop;
     }
 
+    #define USE_UNIQUE_HIT_VARS 0    // 1: Works properly, 0: Fails the if test -- Bug?
+
+    #if USE_UNIQUE_HIT_VARS
+
+    // This configuration works properly
+    #define MAC_DST_HIT_VAR      mac_dst_hit
+    #define IP_DST_HIT_VAR       ip_dst_hit
+    #define IP_SRC_HIT_VAR       ip_src_hit
+    #define EPOCH_ASSIGN_HIT_VAR epoch_assign_hit
+    #define LB_CALENDAR_HIT_VAR  lb_calendar_hit
+    #define MEMBER_INFO_HIT_VAR  member_info_hit
+
+    bool mac_dst_hit;
+    bool ip_dst_hit;
+    bool ip_src_hit;
+    bool epoch_assign_hit;
+    bool lb_calendar_hit;
+    bool member_info_hit;
+
+    #else
+
+    // This configuration returns hit from the mac_dst_filter but behaves as though it missed in the following "if"
+    #define MAC_DST_HIT_VAR      common_hit
+    #define IP_DST_HIT_VAR       common_hit
+    #define IP_SRC_HIT_VAR       common_hit
+    #define EPOCH_ASSIGN_HIT_VAR common_hit
+    #define LB_CALENDAR_HIT_VAR  common_hit
+    #define MEMBER_INFO_HIT_VAR  common_hit
+
+    bool common_hit;
+
+    #endif
+
     // Entry Point
     apply {
-	bool hit;
-
 	// Count all received packets and bytes
 	packet_rx_counter.count(0);
 
@@ -553,8 +584,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    // MacDstFilter
 	    //
 
-	    hit = mac_dst_filter_table.apply().hit;
-	    if (hit) {
+	    MAC_DST_HIT_VAR = mac_dst_filter_table.apply().hit;
+	    if (MAC_DST_HIT_VAR) {
 		if (hdr.ipv4.isValid() ||
 		    hdr.ipv6.isValid() ||
 		    hdr.arp.isValid()) {
@@ -572,8 +603,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 			meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
 		    }
 
-		    hit = ip_dst_filter_table.apply().hit;
-		    if (hit) {
+		    IP_DST_HIT_VAR = ip_dst_filter_table.apply().hit;
+		    if (IP_DST_HIT_VAR) {
 			if (hdr.arp.isValid()) {
 			    // Handle ARP/ND requests
 			    // Make sure this is an ARP specifically for our unicast IPv4 address
@@ -797,14 +828,16 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 			    //   Only allow forwarding packets from explicitly allowed source IPs
 			    //
 
+			    IP_SRC_HIT_VAR = false;
 			    if (hdr.ipv4.isValid() || hdr.ipv6.isValid()) {
 				if (hdr.ipv4.isValid()) {
-				    hit = ipv4_src_filter_table.apply().hit;
+				    IP_SRC_HIT_VAR = ipv4_src_filter_table.apply().hit;
 				} else if (hdr.ipv6.isValid()) {
-				    hit = ipv6_src_filter_table.apply().hit;
+				    IP_SRC_HIT_VAR = ipv6_src_filter_table.apply().hit;
 				}
-				if (!hit) {
+				if (!IP_SRC_HIT_VAR) {
 				    lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
+				    drop();
 				    return;
 				}
 			    } else {
@@ -910,8 +943,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 				// TODO: This should never happen since we checked this above
 			    }
 
-			    hit = epoch_assign_table.apply().hit;
-			    if (!hit) {
+			    EPOCH_ASSIGN_HIT_VAR = epoch_assign_table.apply().hit;
+			    if (!EPOCH_ASSIGN_HIT_VAR) {
 				lb_ctx_drop_epoch_assign_miss_pkt_counter.count(meta_lb_id);
 				return;
 			    }
@@ -940,8 +973,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 			    // Pick the calendar slot for this packet
 			    calendar_slot = (slot_select ^ meta_slot_select_xor) & slot_select_mask;
 
-			    hit = load_balance_calendar_table.apply().hit;
-			    if (!hit) {
+			    LB_CALENDAR_HIT_VAR = load_balance_calendar_table.apply().hit;
+			    if (!LB_CALENDAR_HIT_VAR) {
 				lb_ctx_drop_lb_calendar_miss_pkt_counter.count(meta_lb_id);
 				return;
 			    }
@@ -950,8 +983,8 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 			    // MemberInfoLookup
 			    //
 
-			    hit = member_info_lookup_table.apply().hit;
-			    if (!hit) {
+			    MEMBER_INFO_HIT_VAR = member_info_lookup_table.apply().hit;
+			    if (!MEMBER_INFO_HIT_VAR) {
 				lb_ctx_drop_mbr_info_miss_pkt_counter.count(meta_lb_id);
 				return;
 			    }
