@@ -42,6 +42,7 @@ p4bm:
     - make -s -C p4 compile
     - |
       robot --variable P4_HW_ENV:p4bm-sim \
+            --pythonpath="${XILINX_VIVADO}/tps/lib/python3.13" \
             --pythonpath=esnet-smartnic-hw/test/library/p4_robot_p4bm \
             --pythonpath=esnet-smartnic-hw/test/library/p4_robot \
             --pythonpath=esnet-smartnic-hw/test/library/packet_robot \
