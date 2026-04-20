@@ -49,6 +49,7 @@ p4bm:
             --pythonpath=robot-tests/library/lb_robot \
             --pythonpath=robot-tests/library/packet_lb_robot \
             -d robot-output/ \
+            --nostatusrc \
             robot-tests/p4-tests.robot
     - rebot --xunit robot-output/output.xunit.xml robot-output/output.xml
   artifacts:
