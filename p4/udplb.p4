@@ -378,7 +378,7 @@ out bool tx_ready)
 	size = 64;
     }
 
-    action drop() {
+    action drop_1() {
 	smeta.drop = 1;
     }
 
@@ -413,7 +413,7 @@ out bool tx_ready)
 	    ingress_l2_iface_uc_mac = 0x000000_000000;
 #else
 	    packet_rx_l2_iface_drop_counter.count(0);
-	    drop();
+	    drop_1();
 	    ok = false;
 	    ingress_l2_iface_id = 4w0;
 	    ingress_l2_iface_uc_mac = 48w0;
@@ -429,7 +429,7 @@ out bool tx_ready)
 	bool l2_mac_dst_hit = mac_dst_filter_table.apply().hit;
 	if (!l2_mac_dst_hit) {
 	    packet_rx_l2_dst_drop_counter.count(ingress_l2_iface_id);
-	    drop();
+	    drop_1();
 	    ok = false;
 	    ingress_l2_iface_id = 4w0;
 	    ingress_l2_iface_uc_mac = 48w0;
@@ -482,7 +482,7 @@ out bool tx_ready)
 	size = 64;
     }
 
-    action drop() {
+    action drop_2() {
 	smeta.drop = 1;
 	ok = false;
 	tx_ready = false;
@@ -523,7 +523,7 @@ out bool tx_ready)
 	      hdr.arp.isValid())) {
 	    // Not an IPv4 or IPv6 packet, no further processing
 	    packet_rx_l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
-	    drop();
+	    drop_2();
 	    ingress_l3_iface_uc_ip = 128w0;
 	    ingress_lb_id = 8w0;
 	    return;
@@ -546,7 +546,7 @@ out bool tx_ready)
 	if (!ip_dst_hit) {
 	    // Not destined to any of our IP addresses for this interface
 	    packet_rx_l2_iface_drop_badip_counter.count(ingress_l2_iface_id);
-	    drop();
+	    drop_2();
 	    ingress_l3_iface_uc_ip = 128w0;
 	    ingress_lb_id = 8w0;
 	    return;
@@ -560,7 +560,7 @@ out bool tx_ready)
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != ingress_l3_iface_uc_ip[31:0]) {
 		packet_rx_l3_arp_tpa_nomatch.count(ingress_lb_id);
-		drop();
+		drop_2();
 	    } else {
 		// Convert the request into a reply
 		hdr.arp.oper = 2;
@@ -807,10 +807,6 @@ out bool tx_ready)
     // IPSrcFilter
     //
 
-    action drop() {
-	smeta.drop = 1;
-    }
-
     action allow_ip_src() {
 	// Nothing to do here, basically a no-op
     }
@@ -933,6 +929,10 @@ out bool tx_ready)
 	size = 8192;
     }
 
+    action drop_3() {
+	smeta.drop = 1;
+    }
+
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.BYTES) lb_ctx_rx_byte_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
@@ -969,13 +969,13 @@ out bool tx_ready)
 	    }
 	    if (!ip_src_hit) {
 		lb_ctx_drop_blocked_src_pkt_counter.count(ingress_lb_id);
-		drop();
+		drop_3();
 		return;
 	    }
 	} else {
 	    // Drop all non-IP packets
 	    lb_ctx_drop_not_ip_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -985,7 +985,7 @@ out bool tx_ready)
 	// before processing further.
 	if (!hdr.udplb_common.isValid()) {
 	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -996,7 +996,7 @@ out bool tx_ready)
 	    lb_ctx_rx_v3_counter.count(ingress_lb_id);
 	} else {
 	    lb_ctx_drop_bad_udplb_version_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -1081,7 +1081,7 @@ out bool tx_ready)
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
 	if (!epoch_assign_hit) {
 	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -1112,7 +1112,7 @@ out bool tx_ready)
 	bool lb_calendar_hit = load_balance_calendar_table.apply().hit;
 	if (!lb_calendar_hit) {
 	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -1123,7 +1123,7 @@ out bool tx_ready)
 	bool member_info_hit = member_info_lookup_table.apply().hit;
 	if (!member_info_hit) {
 	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
-	    drop();
+	    drop_3();
 	    return;
 	}
 
@@ -1247,7 +1247,7 @@ inout headers hdr,
 inout smartnic_metadata snmeta,
 inout standard_metadata_t smeta)
 {
-    action drop() {
+    action drop_0() {
 	smeta.drop = 1;
     }
 
@@ -1269,7 +1269,7 @@ inout standard_metadata_t smeta)
 
 	if (smeta.parser_error != error.NoError) {
 	    packet_rx_phys_parsefail_counter.count(snmeta.ingress_port);
-	    drop();
+	    drop_0();
 	    return;
 	}
 
