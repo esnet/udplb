@@ -1,6 +1,11 @@
 #include <core.p4>
 #include <xsa.p4>
 
+// Temporarily operate in a compatibility mode where a miss in the L2 interface map simply
+// assigns the packet into L2 interface 0 with an undefined UC MAC, expecting the old control
+// plane code to be unaware of multiple L2 interfaces, and also to assign the UC MAC in the MAC
+// DA lookup table rather than in the L2 interface map table.
+#define L2_IFACE_MAP_COMPAT_MODE 1
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -340,14 +345,6 @@ out bool tx_ready)
     // Normalized VID with 0 meaning untagged or priority tagged
     bit<12> vlan_id;
 
-    // Deprecated action
-    // This is a compatibility action so old control plane software
-    // works without setting any entries in the l2_iface_table.
-    action set_l2_iface_compat() {
-	ingress_l2_iface_id = 0;
-	ingress_l2_iface_uc_mac = 0x000000_000000;
-    }
-
     action set_l2_iface(bit<4> l2_iface_id, bit<48> l2_iface_uc_mac) {
 	ingress_l2_iface_id = l2_iface_id;
 	ingress_l2_iface_uc_mac = l2_iface_uc_mac;
@@ -356,13 +353,11 @@ out bool tx_ready)
     table l2_iface_table {
 	actions = {
 	    set_l2_iface;
-	    set_l2_iface_compat;
 	}
 	key = {
 	    vlan_id : field_mask;
 	}
 	size = 17;  // 16 l2 sub interfaces + wildcard
-	default_action = set_l2_iface_compat;
     }
 
     //
@@ -399,7 +394,9 @@ out bool tx_ready)
 	smeta.drop = 1;
     }
 
+#if !L2_IFACE_MAP_COMPAT_MODE
     Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS) packet_rx_l2_iface_drop_counter;
+#endif // L2_IFACE_MAP_COMPAT_MODE
     Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_iface_allow_counter;
 
     Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_dst_drop_counter;
@@ -422,7 +419,11 @@ out bool tx_ready)
 	}
 
 	bool l2_iface_hit = l2_iface_table.apply().hit;
-	if (!l2_iface_hit && false) {
+	if (!l2_iface_hit) {
+#if L2_IFACE_MAP_COMPAT_MODE
+	    ingress_l2_iface_id = 0;
+	    ingress_l2_iface_uc_mac = 0x000000_000000;
+#else
 	    packet_rx_l2_iface_drop_counter.count(0);
 	    drop();
 	    ok = false;
