@@ -16,6 +16,9 @@
 #define INCLUDE_ICMPV6_ND_PROC   1
 #define INCLUDE_EJFAT_PROC       1
 
+// Set this to 0 to re-test whether the setValid() handling bug is fixed and IP generation works properly again
+#define ICMPV6_ND_IS_BROKEN_DUE_TO_SETVALID_BUG 1
+
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -774,6 +777,7 @@ out bool tx_ready)
 		    // Set our new payload length
 		    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
 
+#if !ICMPV6_ND_IS_BROKEN_DUE_TO_SETVALID_BUG
 		    // Fill out the ICMPv6 common header
 		    hdr.icmpv6_common.setValid();
 		    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
@@ -795,6 +799,7 @@ out bool tx_ready)
 		    // Fill out the ND advertisement lladdr common header
 		    hdr.ipv6nd_adv_option_lladdr.setValid();
 		    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
+#endif
 		    // Calculate the checksum over the pseudo header + payload
 		    icmp_cksum.clear();
 		    icmp_cksum.add({
