@@ -23,7 +23,7 @@ ${LB_UDP_DST_PORT_MAX}  ${32767}
 
 *** Test Cases ***
 
-LB0 ICMPv4 Echo Test
+LB0 ICMPv4 Echo Request Test
     [Documentation]
     ${packets_in}  Create List
 
@@ -72,7 +72,51 @@ LB0 ICMPv4 Echo Test
     Packet Field Equal  ${pkt}  Raw  load  ${{b'payload goes here'}}
     Packet Checksums Ok  ${pkt}
 
-LB0 ICMPv6Echo Test
+LB0 ICMPv4 Port Unreachable (Unhandled) Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=192.168.2.1  dst=${LB0_UCAST_IPV4}
+    ${pkt}  Packet Extend  ${pkt}  Packet ICMP  type=${3}  code=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_UCAST_IPV4}  dst=192.168.2.99
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${9999}  dport=${1234}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=payload goes here
+
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+
+    # L3 Protocol Handler Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_icmpv4_unhandled  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  0
+
+LB0 ICMPv6Echo Request Test
     [Documentation]
     ${packets_in}  Create List
 
@@ -404,7 +448,24 @@ Low Invalid UDP Port UDPLBv2 IPv4 Drop Test
     # Physical Rx Counters
     P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+
+    # EJFAT Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -431,7 +492,24 @@ High Invalid UDP Port UDPLBv2 IPv4 Drop Test
     # Physical Rx Counters
     P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+
+    # EJFAT Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -444,7 +522,7 @@ Invalid UDPLB version IPv4 Drop Test
 
     ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
     ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_MAX + 1}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
     ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  version=${99}  tick=${10}  entropy=${1}
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
     Append To List  ${packets_in}  ${pkt}

@@ -184,8 +184,6 @@ error {
     UnhandledArpHLen,
     UnhandledArpPLen,
     UnhandledArpOper,
-    UnhandledICMPv4,
-    UnhandledUDPPort,
     InvalidIPpacket,
     InvalidUDPLBmagic
 }
@@ -281,13 +279,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	packet.extract(hdr.icmpv4_common);
 	transition select(hdr.icmpv4_common.msg_type_code) {
 	    8w8 ++ 8w0: parse_icmpv4_echo;
-	    default: parse_icmpv4_unhandled;
+	    default: accept;	// Will be rejected during packet processing
 	}
-    }
-
-    state parse_icmpv4_unhandled {
-	verify(false, error.UnhandledICMPv4);
-	transition reject;
     }
 
     state parse_icmpv4_echo {
@@ -299,13 +292,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
 	    16w0x4000 &&& 16w0xC000: parse_udplb_common;
-	    default: parse_udp_unhandled;
+	    default: accept;	// Will be rejected during packet processing
 	}
-    }
-
-    state parse_udp_unhandled {
-	verify(false, error.UnhandledUDPPort);
-	transition reject;
     }
 
     state parse_udplb_common {
@@ -517,8 +505,10 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_tpa_nomatch;
 
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_unhandled;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_dst_nomatch;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_unhandled;
 
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_echo_ok;
 
@@ -589,180 +579,103 @@ out bool tx_ready)
 		rx_done();
 		return;
 	    }
-	} else if (hdr.icmpv4_echo.isValid()) {
-	    // Remove the old headers from the checksum
-	    l4_cksum.clear();
-	    l4_cksum.subtract({
-		// IPv4 pseudo-header
-		hdr.ipv4.srcAddr,
-		hdr.ipv4.dstAddr,
-		hdr.ipv4.totalLen,
-		8w0 ++ hdr.ipv4.protocol,
-		// ICMPv4 common header (including previous checksum)
-		hdr.icmpv4_common,
-		// ICMPv4 echo header
-		hdr.icmpv4_echo
-	    });
-
-	    // Make sure this is a unicast ping for our unicast IPv4 address
-	    if (hdr.ipv4.dstAddr != ingress_l3_iface_uc_ip[31:0]) {
-		packet_rx_l3_icmpv4_echo_dst_nomatch.count(ingress_lb_id);
-		drop();
-		return;
-	    } else {
-		// Update our ethernet header
-		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
-
-		// Update our ipv4 header addresses
-		// Note: since we're swapping src/dst here, no need to change the IPv4 header checksum
-		// TODO: should we be resetting the TTL on our replies?  Probably yes but that will require checksum fixup
-		hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
-		hdr.ipv4.srcAddr = ingress_l3_iface_uc_ip[31:0];
-
-		// Change the type to be a reply, fixing up the header checksum
-		hdr.icmpv4_common.msg_type_code = 8w0 ++ 8w0;   // Echo Reply
-
-		// Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
-		hdr.icmpv4_common.checksum = 0;
-		l4_cksum.add({
-		    // IPv6 pseudo-header
+	} else if (hdr.icmpv4_common.isValid()) {
+	    if (hdr.icmpv4_echo.isValid()) {
+		// Remove the old headers from the checksum
+		l4_cksum.clear();
+		l4_cksum.subtract({
+		    // IPv4 pseudo-header
 		    hdr.ipv4.srcAddr,
 		    hdr.ipv4.dstAddr,
 		    hdr.ipv4.totalLen,
 		    8w0 ++ hdr.ipv4.protocol,
-		    // ICMPv4 common header fields
+		    // ICMPv4 common header (including previous checksum)
 		    hdr.icmpv4_common,
-		    // ICMPv4 echo header fields
+		    // ICMPv4 echo header
 		    hdr.icmpv4_echo
 		});
-		l4_cksum.get(hdr.icmpv4_common.checksum);
 
-		packet_rx_l3_icmpv4_echo_ok.count(ingress_lb_id);
-		rx_done();
-		return;
-	    }
-	} else if (hdr.icmpv6_echo.isValid()) {
-	    // Remove the old headers from the checksum
-	    l4_cksum.clear();
-	    l4_cksum.subtract({
-		// IPv6 pseudo-header
-		hdr.ipv6.srcAddr,
-		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
-		24w0 ++ hdr.ipv6.nextHdr,
-		// ICMPv6 common header (including previous checksum)
-		hdr.icmpv6_common,
-		// ICMPv6 echo header
-		hdr.icmpv6_echo
-	    });
-
-	    // Update our ethernet header
-	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-	    hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
-
-	    // Swap src and dst IPv6 addresses
-	    bit<128> tmp_ip;
-	    tmp_ip = hdr.ipv6.srcAddr;
-	    hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
-	    hdr.ipv6.dstAddr = tmp_ip;
-
-	    // Make sure we always reply from our unicast IP address
-	    if (hdr.ipv6.srcAddr != ingress_l3_iface_uc_ip) {
-		// This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
-		hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
-	    }
-
-	    // Change the type to be a reply, fixing up the header checksum
-	    hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
-
-	    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
-	    hdr.icmpv6_common.checksum = 0;
-	    l4_cksum.add({
-		// IPv6 pseudo-header
-		hdr.ipv6.srcAddr,
-		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
-		24w0 ++ hdr.ipv6.nextHdr,
-		// ICMP common header fields
-		hdr.icmpv6_common,
-		// ICMPv6 echo header
-		hdr.icmpv6_echo
-	    });
-	    l4_cksum.get(hdr.icmpv6_common.checksum);
-
-	    packet_rx_l3_icmpv6_echo_ok.count(ingress_lb_id);
-	    rx_done();
-	    return;
-	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
-	    bit<128> new_ip_da;
-	    bit<48>  new_mac_da;
-	    bit<1>   solicited;
-
-	    // Make sure this is an ND solicitation for our unicast IPv6 address
-	    if (hdr.ipv6nd_neigh_sol.target != ingress_l3_iface_uc_ip) {
-		packet_rx_l3_ipv6nd_neigh_sol_target_nomatch.count(ingress_lb_id);
-		drop();
-		return;
-	    } else {
-		// Figure out what our destination addresses should be based on the type of query we've received
-		if (hdr.ipv6.srcAddr == 128w0) {
-		    // Source is the unspecified address so reply to the all-nodes multicast IP and clear solicited flag
-		    new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
-		    new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
-		    solicited = 0;
+		// Make sure this is a unicast ping for our unicast IPv4 address
+		if (hdr.ipv4.dstAddr != ingress_l3_iface_uc_ip[31:0]) {
+		    packet_rx_l3_icmpv4_echo_dst_nomatch.count(ingress_lb_id);
+		    drop_2();
+		    return;
 		} else {
-		    // Reply to the originating source IP and set the solicited flag
-		    new_ip_da = hdr.ipv6.srcAddr;
+		    // Update our ethernet header
+		    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+		    hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
 
-		    if (hdr.ipv6nd_option_lladdr.isValid()) {
-			// The request includes a link-layer address for the originator, reply to that
-			new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
-		    } else {
-			// No link-layer address option, reply to the unicast MAC from the original frame
-			new_mac_da = hdr.ethernet.srcAddr;
-		    }
-		    solicited = 1;
+		    // Update our ipv4 header addresses
+		    // Note: since we're swapping src/dst here, no need to change the IPv4 header checksum
+		    // TODO: should we be resetting the TTL on our replies?  Probably yes but that will require checksum fixup
+		    hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
+		    hdr.ipv4.srcAddr = ingress_l3_iface_uc_ip[31:0];
+
+		    // Change the type to be a reply, fixing up the header checksum
+		    hdr.icmpv4_common.msg_type_code = 8w0 ++ 8w0;   // Echo Reply
+
+		    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
+		    hdr.icmpv4_common.checksum = 0;
+		    l4_cksum.add({
+			// IPv6 pseudo-header
+			hdr.ipv4.srcAddr,
+			hdr.ipv4.dstAddr,
+			hdr.ipv4.totalLen,
+			8w0 ++ hdr.ipv4.protocol,
+			// ICMPv4 common header fields
+			hdr.icmpv4_common,
+			// ICMPv4 echo header fields
+			hdr.icmpv4_echo
+		    });
+		    l4_cksum.get(hdr.icmpv4_common.checksum);
+
+		    packet_rx_l3_icmpv4_echo_ok.count(ingress_lb_id);
+		    rx_done();
+		    return;
 		}
+	    } else {
+		// Unhandled ICMPv4 packet type
+		packet_rx_l3_icmpv4_unhandled.count(ingress_lb_id);
+		drop_2();
+		return;
+	    }
+	} else if (hdr.icmpv6_common.isValid()) {
+	    } else if (hdr.icmpv6_echo.isValid()) {
+		// Remove the old headers from the checksum
+		l4_cksum.clear();
+		l4_cksum.subtract({
+		    // IPv6 pseudo-header
+		    hdr.ipv6.srcAddr,
+		    hdr.ipv6.dstAddr,
+		    16w0 ++ hdr.ipv6.payloadLen,
+		    24w0 ++ hdr.ipv6.nextHdr,
+		    // ICMPv6 common header (including previous checksum)
+		    hdr.icmpv6_common,
+		    // ICMPv6 echo header
+		    hdr.icmpv6_echo
+		});
 
-		// Update our ethernet header addresses
-		hdr.ethernet.dstAddr = new_mac_da;
+		// Update our ethernet header
+		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
 
-		// Update our ipv6 header addresses
-		hdr.ipv6.dstAddr = new_ip_da;
-		hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
+		// Swap src and dst IPv6 addresses
+		bit<128> tmp_ip;
+		tmp_ip = hdr.ipv6.srcAddr;
+		hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
+		hdr.ipv6.dstAddr = tmp_ip;
 
-		// Reset our hop limit
-		hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
+		// Make sure we always reply from our unicast IP address
+		if (hdr.ipv6.srcAddr != ingress_l3_iface_uc_ip) {
+		    // This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
+		    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
+		}
 
-		// Set our new payload length
-		hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
+		// Change the type to be a reply, fixing up the header checksum
+		hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
 
-		// Fill out the ICMPv6 common header
-		hdr.icmpv6_common.setValid();
-		hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
-		hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
-
-		// Fill out our ND advertisement
-		hdr.ipv6nd_neigh_adv.setValid();
-		hdr.ipv6nd_neigh_adv.router_flag    = 0;
-		hdr.ipv6nd_neigh_adv.solicited_flag = solicited;
-		hdr.ipv6nd_neigh_adv.override_flag  = 0;
-		hdr.ipv6nd_neigh_adv.rsvd           = 0;
-		hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
-
-		// Fill out the ND advertisement option common header
-		hdr.ipv6nd_adv_option_common.setValid();
-		hdr.ipv6nd_adv_option_common.option_type   = 2;   // Target Link-Layer Address
-		hdr.ipv6nd_adv_option_common.length        = 1;
-
-		// Fill out the ND advertisement lladdr common header
-		hdr.ipv6nd_adv_option_lladdr.setValid();
-		hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
-
-		// Calculate the checksum over the pseudo header + payload
-		l4_cksum.clear();
+		// Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
+		hdr.icmpv6_common.checksum = 0;
 		l4_cksum.add({
 		    // IPv6 pseudo-header
 		    hdr.ipv6.srcAddr,
@@ -771,17 +684,107 @@ out bool tx_ready)
 		    24w0 ++ hdr.ipv6.nextHdr,
 		    // ICMP common header fields
 		    hdr.icmpv6_common,
-		    // ICMP neighbour advertisement header
-		    hdr.ipv6nd_neigh_adv,
-		    // ICMP neighbour advertisement option common header fields
-		    hdr.ipv6nd_adv_option_common,
-		    // ICMP neighbour advertisement LLADDR header fields
-		    hdr.ipv6nd_adv_option_lladdr
+		    // ICMPv6 echo header
+		    hdr.icmpv6_echo
 		});
 		l4_cksum.get(hdr.icmpv6_common.checksum);
 
-		packet_rx_l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
+		packet_rx_l3_icmpv6_echo_ok.count(ingress_lb_id);
 		rx_done();
+		return;
+	    } else if (hdr.ipv6nd_neigh_sol.isValid()) {
+		bit<128> new_ip_da;
+		bit<48>  new_mac_da;
+		bit<1>   solicited;
+
+		// Make sure this is an ND solicitation for our unicast IPv6 address
+		if (hdr.ipv6nd_neigh_sol.target != ingress_l3_iface_uc_ip) {
+		    packet_rx_l3_ipv6nd_neigh_sol_target_nomatch.count(ingress_lb_id);
+		    drop_2();
+		    return;
+		} else {
+		    // Figure out what our destination addresses should be based on the type of query we've received
+		    if (hdr.ipv6.srcAddr == 128w0) {
+			// Source is the unspecified address so reply to the all-nodes multicast IP and clear solicited flag
+			new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
+			new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
+			solicited = 0;
+		    } else {
+			// Reply to the originating source IP and set the solicited flag
+			new_ip_da = hdr.ipv6.srcAddr;
+
+			if (hdr.ipv6nd_option_lladdr.isValid()) {
+			    // The request includes a link-layer address for the originator, reply to that
+			    new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
+			} else {
+			    // No link-layer address option, reply to the unicast MAC from the original frame
+			    new_mac_da = hdr.ethernet.srcAddr;
+			}
+			solicited = 1;
+		    }
+
+		    // Update our ethernet header addresses
+		    hdr.ethernet.dstAddr = new_mac_da;
+		    hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
+
+		    // Update our ipv6 header addresses
+		    hdr.ipv6.dstAddr = new_ip_da;
+		    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
+
+		    // Reset our hop limit
+		    hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
+
+		    // Set our new payload length
+		    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
+
+		    // Fill out the ICMPv6 common header
+		    hdr.icmpv6_common.setValid();
+		    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
+		    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
+
+		    // Fill out our ND advertisement
+		    hdr.ipv6nd_neigh_adv.setValid();
+		    hdr.ipv6nd_neigh_adv.router_flag    = 0;
+		    hdr.ipv6nd_neigh_adv.solicited_flag = solicited;
+		    hdr.ipv6nd_neigh_adv.override_flag  = 0;
+		    hdr.ipv6nd_neigh_adv.rsvd           = 0;
+		    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
+
+		    // Fill out the ND advertisement option common header
+		    hdr.ipv6nd_adv_option_common.setValid();
+		    hdr.ipv6nd_adv_option_common.option_type   = 2;   // Target Link-Layer Address
+		    hdr.ipv6nd_adv_option_common.length        = 1;
+
+		    // Fill out the ND advertisement lladdr common header
+		    hdr.ipv6nd_adv_option_lladdr.setValid();
+		    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
+		    // Calculate the checksum over the pseudo header + payload
+		    l4_cksum.clear();
+		    l4_cksum.add({
+			// IPv6 pseudo-header
+			hdr.ipv6.srcAddr,
+			hdr.ipv6.dstAddr,
+			16w0 ++ hdr.ipv6.payloadLen,
+			24w0 ++ hdr.ipv6.nextHdr,
+			// ICMP common header fields
+			hdr.icmpv6_common,
+			// ICMP neighbour advertisement header
+			hdr.ipv6nd_neigh_adv,
+			// ICMP neighbour advertisement option common header fields
+			hdr.ipv6nd_adv_option_common,
+			// ICMP neighbour advertisement LLADDR header fields
+			hdr.ipv6nd_adv_option_lladdr
+		    });
+		    l4_cksum.get(hdr.icmpv6_common.checksum);
+
+		    packet_rx_l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
+		    rx_done();
+		    return;
+		}
+	    } else {
+		// Unhandled ICMPv6 packet type
+		packet_rx_l3_icmpv6_unhandled.count(ingress_lb_id);
+		drop_2();
 		return;
 	    }
 	}
