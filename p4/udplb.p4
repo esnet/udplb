@@ -515,7 +515,7 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_target_nomatch;
 
-    InternetChecksum() l4_cksum;
+    InternetChecksum() icmp_cksum;
 
     apply {
 	if (!(hdr.ipv4.isValid() ||
@@ -582,8 +582,8 @@ out bool tx_ready)
 	} else if (hdr.icmpv4_common.isValid()) {
 	    if (hdr.icmpv4_echo.isValid()) {
 		// Remove the old headers from the checksum
-		l4_cksum.clear();
-		l4_cksum.subtract({
+		icmp_cksum.clear();
+		icmp_cksum.subtract({
 		    // IPv4 pseudo-header
 		    hdr.ipv4.srcAddr,
 		    hdr.ipv4.dstAddr,
@@ -616,7 +616,7 @@ out bool tx_ready)
 
 		    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
 		    hdr.icmpv4_common.checksum = 0;
-		    l4_cksum.add({
+		    icmp_cksum.add({
 			// IPv6 pseudo-header
 			hdr.ipv4.srcAddr,
 			hdr.ipv4.dstAddr,
@@ -627,7 +627,7 @@ out bool tx_ready)
 			// ICMPv4 echo header fields
 			hdr.icmpv4_echo
 		    });
-		    l4_cksum.get(hdr.icmpv4_common.checksum);
+		    icmp_cksum.get(hdr.icmpv4_common.checksum);
 
 		    packet_rx_l3_icmpv4_echo_ok.count(ingress_lb_id);
 		    rx_done();
@@ -642,8 +642,8 @@ out bool tx_ready)
 	} else if (hdr.icmpv6_common.isValid()) {
 	    } else if (hdr.icmpv6_echo.isValid()) {
 		// Remove the old headers from the checksum
-		l4_cksum.clear();
-		l4_cksum.subtract({
+		icmp_cksum.clear();
+		icmp_cksum.subtract({
 		    // IPv6 pseudo-header
 		    hdr.ipv6.srcAddr,
 		    hdr.ipv6.dstAddr,
@@ -676,7 +676,7 @@ out bool tx_ready)
 
 		// Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
 		hdr.icmpv6_common.checksum = 0;
-		l4_cksum.add({
+		icmp_cksum.add({
 		    // IPv6 pseudo-header
 		    hdr.ipv6.srcAddr,
 		    hdr.ipv6.dstAddr,
@@ -687,7 +687,7 @@ out bool tx_ready)
 		    // ICMPv6 echo header
 		    hdr.icmpv6_echo
 		});
-		l4_cksum.get(hdr.icmpv6_common.checksum);
+		icmp_cksum.get(hdr.icmpv6_common.checksum);
 
 		packet_rx_l3_icmpv6_echo_ok.count(ingress_lb_id);
 		rx_done();
@@ -759,8 +759,8 @@ out bool tx_ready)
 		    hdr.ipv6nd_adv_option_lladdr.setValid();
 		    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
 		    // Calculate the checksum over the pseudo header + payload
-		    l4_cksum.clear();
-		    l4_cksum.add({
+		    icmp_cksum.clear();
+		    icmp_cksum.add({
 			// IPv6 pseudo-header
 			hdr.ipv6.srcAddr,
 			hdr.ipv6.dstAddr,
@@ -775,7 +775,7 @@ out bool tx_ready)
 			// ICMP neighbour advertisement LLADDR header fields
 			hdr.ipv6nd_adv_option_lladdr
 		    });
-		    l4_cksum.get(hdr.icmpv6_common.checksum);
+		    icmp_cksum.get(hdr.icmpv6_common.checksum);
 
 		    packet_rx_l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
 		    rx_done();
