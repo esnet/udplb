@@ -813,7 +813,6 @@ out bool tx_ready)
 
     table ipv4_src_filter_table {
 	actions = {
-	    drop;
 	    allow_ip_src;
 	}
 	key = {
@@ -821,12 +820,10 @@ out bool tx_ready)
 	    hdr.ipv4.srcAddr : exact;
 	}
 	size = 256;
-	default_action = drop;
     }
 
     table ipv6_src_filter_table {
 	actions = {
-	    drop;
 	    allow_ip_src;
 	}
 	key = {
@@ -834,7 +831,6 @@ out bool tx_ready)
 	    hdr.ipv6.srcAddr : exact;
 	}
 	size = 256;
-	default_action = drop;
     }
 
     //
@@ -862,14 +858,12 @@ out bool tx_ready)
 	actions = {
 	    do_assign_epoch;
 	    do_assign_epoch_with_slot_sel_opts;
-	    drop;
 	}
 	key = {
 	    ingress_lb_id : exact;
 	    tick : lpm;
 	}
 	size = 1024;
-	default_action = drop;
     }
 
     //
@@ -886,7 +880,6 @@ out bool tx_ready)
     table load_balance_calendar_table {
 	actions = {
 	    do_assign_member;
-	    drop;
 	}
 	key = {
 	    ingress_lb_id : exact;
@@ -894,7 +887,6 @@ out bool tx_ready)
 	    calendar_slot : exact;
 	}
 	size = 16384;
-	default_action = drop;
     }
 
     //
@@ -928,7 +920,6 @@ out bool tx_ready)
 	actions = {
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
-	    drop;
 	}
 	key = {
 	    ingress_lb_id : exact;
@@ -936,7 +927,6 @@ out bool tx_ready)
 	    meta_member_id : exact;
 	}
 	size = 8192;
-	default_action = drop;
     }
 
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
@@ -1087,6 +1077,7 @@ out bool tx_ready)
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
 	if (!epoch_assign_hit) {
 	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
+	    drop();
 	    return;
 	}
 
@@ -1117,6 +1108,7 @@ out bool tx_ready)
 	bool lb_calendar_hit = load_balance_calendar_table.apply().hit;
 	if (!lb_calendar_hit) {
 	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(ingress_lb_id);
+	    drop();
 	    return;
 	}
 
@@ -1127,6 +1119,7 @@ out bool tx_ready)
 	bool member_info_hit = member_info_lookup_table.apply().hit;
 	if (!member_info_hit) {
 	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
+	    drop();
 	    return;
 	}
 
