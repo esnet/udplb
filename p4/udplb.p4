@@ -6,6 +6,16 @@
 // plane code to be unaware of multiple L2 interfaces, and also to assign the UC MAC in the MAC
 // DA lookup table rather than in the L2 interface map table.
 #define L2_IFACE_MAP_COMPAT_MODE 1
+
+#define INCLUDE_L2_PROC          1
+#define INCLUDE_L3_PROC          1
+#define INCLUDE_ARP_PROC         1
+#define INCLUDE_ICMPV4_PROC      1
+#define INCLUDE_ICMPV6_PROC      1
+#define INCLUDE_ICMPV6_ECHO_PROC 1
+#define INCLUDE_ICMPV6_ND_PROC   1
+#define INCLUDE_EJFAT_PROC       1
+
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -316,6 +326,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     }
 }
 
+#if INCLUDE_L2_PROC
 
 control L2IfaceMap(
 inout headers hdr,
@@ -419,6 +430,7 @@ out bool tx_ready)
 	    ingress_l2_iface_uc_mac = 48w0;
 	    tx_ready = false;
 	    return;
+#endif
 	}
 
 	// Packet was received on a valid, configured L2 tagged or untagged interface
@@ -447,6 +459,10 @@ out bool tx_ready)
 	return;
     }
 }
+
+#endif // INCLUDE_L2_PROC
+
+#if INCLUDE_L3_PROC
 
 control L3IfaceMap(
 inout headers hdr,
@@ -502,20 +518,31 @@ out bool tx_ready)
     Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_iface_drop_badip_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_allow_counter;
 
+#if INCLUDE_ARP_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_tpa_nomatch;
+#endif
 
+#if INCLUDE_ICMPV4_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_unhandled;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_dst_nomatch;
+#endif // INCLUDE_ICMPV4_PROC
+
+#if INCLUDE_ICMPV6_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_unhandled;
 
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_echo_ok;
 
+#if INCLUDE_ICMPV6_ND_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_target_nomatch;
+#endif // INCLUDE_ICMPV6_ND_PROC
+#endif // INCLUDE_ICMPV6_PROC
 
+#if INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
     InternetChecksum() icmp_cksum;
+#endif // INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
 
     apply {
 	if (!(hdr.ipv4.isValid() ||
@@ -555,7 +582,9 @@ out bool tx_ready)
 	// Packet is destined to a valid IP for this interface so from here, we have an LB instance context
 	packet_rx_l3_allow_counter.count(ingress_lb_id);
 
-	if (hdr.arp.isValid()) {
+	if (false) {
+#if INCLUDE_ARP_PROC
+	} else if (hdr.arp.isValid()) {
 	    // Handle ARP/ND requests
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != ingress_l3_iface_uc_ip[31:0]) {
@@ -579,6 +608,8 @@ out bool tx_ready)
 		rx_done();
 		return;
 	    }
+#endif // INCLUDE_ARP_PROC
+#if INCLUDE_ICMPV4_PROC
 	} else if (hdr.icmpv4_common.isValid()) {
 	    if (hdr.icmpv4_echo.isValid()) {
 		// Remove the old headers from the checksum
@@ -639,7 +670,11 @@ out bool tx_ready)
 		drop_2();
 		return;
 	    }
+#endif // INCLUDE_ICMPV4_PROC
+#if INCLUDE_ICMPV6_PROC
 	} else if (hdr.icmpv6_common.isValid()) {
+	    if (false) {
+#if INCLUDE_ICMPV6_ECHO_PROC
 	    } else if (hdr.icmpv6_echo.isValid()) {
 		// Remove the old headers from the checksum
 		icmp_cksum.clear();
@@ -692,6 +727,8 @@ out bool tx_ready)
 		packet_rx_l3_icmpv6_echo_ok.count(ingress_lb_id);
 		rx_done();
 		return;
+#endif // INCLUDE_ICMPV6_ECHO_PROC
+#if INCLUDE_ICMPV6_ND_PROC
 	    } else if (hdr.ipv6nd_neigh_sol.isValid()) {
 		bit<128> new_ip_da;
 		bit<48>  new_mac_da;
@@ -781,17 +818,22 @@ out bool tx_ready)
 		    rx_done();
 		    return;
 		}
+#endif // INCLUDE_ICMPV6_ND_PROC
 	    } else {
 		// Unhandled ICMPv6 packet type
 		packet_rx_l3_icmpv6_unhandled.count(ingress_lb_id);
 		drop_2();
 		return;
 	    }
+#endif // INCLUDE_ICMPV6_PROC
 	}
 	rx_continue();
 	return;
     }
 }
+#endif // INCLUDE_L3_PROC
+
+#if INCLUDE_EJFAT_PROC
 
 control EJFAT(
 inout headers hdr,
@@ -1242,6 +1284,8 @@ out bool tx_ready)
     }
 }
 
+#endif // INCLUDE_EJFAT_PROC
+
 control MatchActionImpl(
 inout headers hdr,
 inout smartnic_metadata snmeta,
@@ -1282,16 +1326,22 @@ inout standard_metadata_t smeta)
 	bit<4> ingress_l2_iface_id;
 	bit<48> ingress_l2_iface_uc_mac;
 
+#if INCLUDE_L2_PROC
 	L2IfaceMap.apply(hdr, snmeta, smeta, ok, ingress_l2_iface_id, ingress_l2_iface_uc_mac, tx_ready);
 	if (!ok || tx_ready) return;
+#endif // INCLUDE_L2_PROC
 
+#if INCLUDE_L3_PROC
 	bit<128> ingress_l3_iface_uc_ip;
 	bit<8> ingress_lb_id;
 	L3IfaceMap.apply(hdr, snmeta, smeta, ingress_l2_iface_id, ingress_l2_iface_uc_mac, ok, ingress_l3_iface_uc_ip, ingress_lb_id, tx_ready);
 	if (!ok || tx_ready) return;
+#endif // INCLUDE_L3_PROC
 
+#if INCLUDE_EJFAT_PROC
 	EJFAT.apply(hdr, snmeta, smeta, ingress_l2_iface_uc_mac, ok, ingress_l3_iface_uc_ip, ingress_lb_id, tx_ready);
 	if (!ok || tx_ready) return;
+#endif // INCLUDE_EJFAT_PROC
 
 	// How did we get here?!?
 	return;
