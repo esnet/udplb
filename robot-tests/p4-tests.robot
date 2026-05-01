@@ -1025,19 +1025,19 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     # L3 Rx Counters
     P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
     P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  1
+    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  1
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
 
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  1
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     #Packet Log Packets  ${packets_out}
