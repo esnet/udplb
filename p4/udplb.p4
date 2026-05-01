@@ -1047,6 +1047,14 @@ out bool tx_ready)
 	    return;
 	}
 
+	// NOTE  NOTE  NOTE  NOTE
+	//
+	// All packets past this point are confirmed to be
+	//   (IPv4 or IPv6) and UDP and (UDPLBv2 or UDPLBv3)
+	// all remaining checks below will rely on this
+	//
+	// NOTE  NOTE  NOTE  NOTE
+
 	// Subtract the old IPv4 header from the l3 checksum (if present) before modifying it
 	// NOTE: This is to avoid having to keep track of the checksum over the IPv4 options
 	l3_cksum.clear();
@@ -1075,8 +1083,6 @@ out bool tx_ready)
 		16w0 ++ hdr.ipv6.payloadLen,
 		24w0 ++ hdr.ipv6.nextHdr
 	    });
-	} else {
-	    // TODO: This should never happen because we checked above
 	}
 
 	// Subtract the old UDP header (incl. the old checksum) from the UDP checksum
@@ -1093,8 +1099,6 @@ out bool tx_ready)
 		hdr.udplb_common,
 		hdr.udplb_v3
 	    });
-	} else {
-	    // TODO: This should never happen because we checked above
 	}
 
 	// All packets must be originated with our assigned unicast MAC address
@@ -1108,8 +1112,6 @@ out bool tx_ready)
 	    hdr.ipv4.srcAddr = ingress_l3_iface_uc_ip[31:0];
 	} else if (hdr.ipv6.isValid()) {
 	    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
-	} else {
-	    // TODO: This should never happen because we checked above
 	}
 
 	//
@@ -1121,8 +1123,6 @@ out bool tx_ready)
 	    tick = hdr.udplb_v2.tick;
 	} else if (hdr.udplb_v3.isValid()) {
 	    tick = hdr.udplb_v3.tick;
-	} else {
-	    // TODO: This should never happen since we checked this above
 	}
 
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
@@ -1146,8 +1146,6 @@ out bool tx_ready)
 	} else if (hdr.udplb_v3.isValid()) {
 	    // v3 uses a dedicated field as the slot selector
 	    slot_select = hdr.udplb_v3.slot_select[15:0];
-	} else {
-	    // TODO: This should never happen since we checked above
 	}
 
 	// The number of significant bits for the calendar lookup can vary dynamically by epoch
@@ -1197,8 +1195,6 @@ out bool tx_ready)
 	    if (!meta_keep_lb_header) {
 		hdr.ipv6.payloadLen = hdr.ipv6.payloadLen - SIZEOF_UDPLB_HDR;
 	    }
-	} else {
-	    // TODO: This should never happen because we checked above
 	}
 
 	// Normalize the port_select value across the different LB protocol versions
@@ -1208,8 +1204,6 @@ out bool tx_ready)
 	    port_select = hdr.udplb_v2.entropy;
 	} else if (hdr.udplb_v3.isValid()) {
 	    port_select = hdr.udplb_v3.port_select;
-	} else {
-	    // TODO: This should never happen because we checked above
 	}
 
 	// The number of significant bits for the port offset varies by LB member
@@ -1253,8 +1247,6 @@ out bool tx_ready)
 		    16w0 ++ hdr.ipv6.payloadLen,
 		    24w0 ++ hdr.ipv6.nextHdr
 		});
-	    } else {
-		// TODO: This should never happen because we checked above
 	    }
 
 	    // Zero out the UDP checksum field and add in the UDP header
@@ -1270,8 +1262,6 @@ out bool tx_ready)
 		l4_cksum.add(hdr.udplb_v2);
 	    } else if (hdr.udplb_v3.isValid()) {
 		l4_cksum.add(hdr.udplb_v3);
-	    } else {
-		// TODO: This should never happen because we checked above
 	    }
 
 	    // Retrieve the computed UDP checksum
