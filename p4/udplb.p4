@@ -959,10 +959,14 @@ out bool tx_ready)
 	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
+    action drop() {
+    }
+
     table member_info_lookup_table {
 	actions = {
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
+	    drop;
 	}
 	key = {
 	    ingress_lb_id : exact;
