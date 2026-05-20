@@ -942,6 +942,7 @@ out bool tx_ready)
     bit<16>  meta_udp_base            = 0;
     bit<5>   meta_port_select_bit_cnt = 0;
     bool     meta_keep_lb_header      = false;
+    bit<2>   member_drop_reason       = 0;  // default to not dropped
 
     action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<5> port_select_bit_cnt, bit<1> keep_lb_header) {
 	new_mac_dst              = mac_dst;
@@ -959,6 +960,16 @@ out bool tx_ready)
 	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
+    action drop_soft_evicted() {
+	member_drop_reason = 1;
+    }
+
+    action drop_deregistered() {
+	member_drop_reason = 2;
+    }
+
+    // Deprecated action for backward compatibility only
+    // Use more specific "drop_soft_evicted" or "drop_deregistered" action
     action drop() {
     }
 
@@ -967,6 +978,8 @@ out bool tx_ready)
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
 	    drop;
+	    drop_soft_evicted;
+	    drop_deregistered;
 	}
 	key = {
 	    ingress_lb_id : exact;
@@ -991,6 +1004,8 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_soft_evicted_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_deregistered_counter;
     Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
     Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
 
@@ -1170,6 +1185,20 @@ out bool tx_ready)
 	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
+	}
+
+	if (member_drop_reason == 1) {
+	    // Found an entry, but packet was dropped due to soft-eviction
+	    lb_mbr_drop_soft_evicted_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else if (member_drop_reason == 2) {
+	    // Found an entry, but packet was dropped due to deregistered
+	    lb_mbr_drop_deregistered_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else {
+	    // Not dropped, continue processing, will be counted later
 	}
 
 	// Set the MAC DA to point to the next hop at L2
