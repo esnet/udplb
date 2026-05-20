@@ -850,8 +850,14 @@ out bool tx_ready)
     // IPSrcFilter
     //
 
+    bit<8> meta_src_id = 0;
+
     action allow_ip_src() {
 	// Nothing to do here, basically a no-op
+    }
+
+    action allow_ip_src_with_id(bit<8>src_id) {
+	meta_src_id = src_id;
     }
 
     table ipv4_src_filter_table {
@@ -1009,6 +1015,8 @@ out bool tx_ready)
     Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
     Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
 
+    Register<bit<64>, bit<8>>(256) src_tick;
+
     InternetChecksum() l3_cksum;
     InternetChecksum() l4_cksum;
 
@@ -1139,6 +1147,9 @@ out bool tx_ready)
 	} else if (hdr.udplb_v3.isValid()) {
 	    tick = hdr.udplb_v3.tick;
 	}
+
+	// Record the latest tick value provided by this sender
+	src_tick.write(meta_src_id, tick);
 
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
 	if (!epoch_assign_hit) {
