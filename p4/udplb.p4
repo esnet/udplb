@@ -973,7 +973,7 @@ out bool tx_ready)
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 8192;
+	size = 1024;
     }
 
     action drop_3() {
@@ -991,8 +991,8 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
-    Counter<bit<64>, bit<13>>(16, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
-    Counter<bit<64>, bit<13>>(16, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
 
     InternetChecksum() l3_cksum;
     InternetChecksum() l4_cksum;
@@ -1274,8 +1274,8 @@ out bool tx_ready)
 	    }
 	}
 
-	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
-	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
+	lb_mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
+	lb_mbr_tx_byte_counter.count((bit<10>)meta_member_id);
     }
 }
 
