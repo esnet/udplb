@@ -211,8 +211,6 @@ LB0 ARP Test
 LB0 ICMPv6ND_NS Unicast Source Test
     [Documentation]
 
-    [Tags]  robot:skip
-
     ${packets_in}  Create List
 
     ${ipv6_sol_node_mcast_addr}  LB IPv6 to Solicited Node Mcast  ${LB0_UCAST_IPV6}
@@ -268,8 +266,6 @@ LB0 ICMPv6ND_NS Unicast Source Test
 
 LB0 ICMPv6ND_NS Unspecified Source Test
     [Documentation]
-
-    [Tags]  robot:skip
 
     ${packets_in}  Create List
 
