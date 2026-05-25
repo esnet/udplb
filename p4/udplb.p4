@@ -1387,6 +1387,7 @@ inout standard_metadata_t smeta)
 #endif // INCLUDE_EJFAT_PROC
 
 	// How did we get here?!?
+	smeta.drop = 1;
 	return;
     }
 }
