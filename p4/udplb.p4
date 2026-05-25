@@ -417,17 +417,20 @@ out bool tx_ready)
 	    vlan_id = 0;
 	}
 
+	// Silence uninit warnings but init to unlikely values
+	ingress_l2_iface_id = 15;
+	ingress_l2_iface_uc_mac = 0x000000_000000;
+
 	bool l2_iface_hit = l2_iface_table.apply().hit;
 	if (!l2_iface_hit) {
 #if L2_IFACE_MAP_COMPAT_MODE
+	    // Override L2 interface to be backward compatible with previous control plane SW
 	    ingress_l2_iface_id = 0;
 	    ingress_l2_iface_uc_mac = 0x000000_000000;
 #else
 	    l2_iface_drop_counter.count(0);
 	    drop_1();
 	    ok = false;
-	    ingress_l2_iface_id = 4w0;
-	    ingress_l2_iface_uc_mac = 48w0;
 	    tx_ready = false;
 	    return;
 #endif
@@ -545,14 +548,16 @@ out bool tx_ready)
 #endif // INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
 
     apply {
+	// Silence uninit warnings but init to unlikely values
+	ingress_lb_id = 15;
+	ingress_l3_iface_uc_ip = 128w0;
+
 	if (!hdr.ipv4.isValid() &&
 	    !hdr.ipv6.isValid() &&
 	    !hdr.arp.isValid()) {
 	    // Not an IPv4 or IPv6 packet, no further processing
 	    l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
 	    drop_2();
-	    ingress_l3_iface_uc_ip = 128w0;
-	    ingress_lb_id = 8w0;
 	    return;
 	}
 
@@ -574,8 +579,6 @@ out bool tx_ready)
 	    // Not destined to any of our IP addresses for this interface
 	    l2_iface_drop_badip_counter.count(ingress_l2_iface_id);
 	    drop_2();
-	    ingress_l3_iface_uc_ip = 128w0;
-	    ingress_lb_id = 8w0;
 	    return;
 	}
 
