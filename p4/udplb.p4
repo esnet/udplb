@@ -16,9 +16,6 @@
 #define INCLUDE_ICMPV6_ND_PROC   1
 #define INCLUDE_EJFAT_PROC       1
 
-// Set this to 0 to re-test whether the setValid() handling bug is fixed and IP generation works properly again
-#define ICMPV6_ND_IS_BROKEN_DUE_TO_SETVALID_BUG 1
-
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -548,9 +545,9 @@ out bool tx_ready)
 #endif // INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
 
     apply {
-	if (!(hdr.ipv4.isValid() ||
-	      hdr.ipv6.isValid() ||
-	      hdr.arp.isValid())) {
+	if (!hdr.ipv4.isValid() &&
+	    !hdr.ipv6.isValid() &&
+	    !hdr.arp.isValid()) {
 	    // Not an IPv4 or IPv6 packet, no further processing
 	    packet_rx_l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
 	    drop_2();
@@ -777,7 +774,6 @@ out bool tx_ready)
 		    // Set our new payload length
 		    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
 
-#if !ICMPV6_ND_IS_BROKEN_DUE_TO_SETVALID_BUG
 		    // Fill out the ICMPv6 common header
 		    hdr.icmpv6_common.setValid();
 		    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
@@ -799,7 +795,7 @@ out bool tx_ready)
 		    // Fill out the ND advertisement lladdr common header
 		    hdr.ipv6nd_adv_option_lladdr.setValid();
 		    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
-#endif
+
 		    // Calculate the checksum over the pseudo header + payload
 		    icmp_cksum.clear();
 		    icmp_cksum.add({
@@ -854,8 +850,14 @@ out bool tx_ready)
     // IPSrcFilter
     //
 
+    bit<8> meta_src_id = 0;
+
     action allow_ip_src() {
 	// Nothing to do here, basically a no-op
+    }
+
+    action allow_ip_src_with_id(bit<8>src_id) {
+	meta_src_id = src_id;
     }
 
     table ipv4_src_filter_table {
@@ -946,6 +948,7 @@ out bool tx_ready)
     bit<16>  meta_udp_base            = 0;
     bit<5>   meta_port_select_bit_cnt = 0;
     bool     meta_keep_lb_header      = false;
+    bit<2>   member_drop_reason       = 0;  // default to not dropped
 
     action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<5> port_select_bit_cnt, bit<1> keep_lb_header) {
 	new_mac_dst              = mac_dst;
@@ -963,17 +966,33 @@ out bool tx_ready)
 	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
+    action drop_soft_evicted() {
+	member_drop_reason = 1;
+    }
+
+    action drop_deregistered() {
+	member_drop_reason = 2;
+    }
+
+    // Deprecated action for backward compatibility only
+    // Use more specific "drop_soft_evicted" or "drop_deregistered" action
+    action drop() {
+    }
+
     table member_info_lookup_table {
 	actions = {
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
+	    drop;
+	    drop_soft_evicted;
+	    drop_deregistered;
 	}
 	key = {
 	    ingress_lb_id : exact;
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 8192;
+	size = 1024;
     }
 
     action drop_3() {
@@ -991,8 +1010,12 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
-    Counter<bit<64>, bit<13>>(16, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
-    Counter<bit<64>, bit<13>>(16, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_soft_evicted_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_deregistered_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
+
+    Register<bit<64>, bit<8>>(256) src_tick;
 
     InternetChecksum() l3_cksum;
     InternetChecksum() l4_cksum;
@@ -1125,6 +1148,9 @@ out bool tx_ready)
 	    tick = hdr.udplb_v3.tick;
 	}
 
+	// Record the latest tick value provided by this sender
+	src_tick.write(meta_src_id, tick);
+
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
 	if (!epoch_assign_hit) {
 	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
@@ -1170,6 +1196,20 @@ out bool tx_ready)
 	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
+	}
+
+	if (member_drop_reason == 1) {
+	    // Found an entry, but packet was dropped due to soft-eviction
+	    lb_mbr_drop_soft_evicted_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else if (member_drop_reason == 2) {
+	    // Found an entry, but packet was dropped due to deregistered
+	    lb_mbr_drop_deregistered_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else {
+	    // Not dropped, continue processing, will be counted later
 	}
 
 	// Set the MAC DA to point to the next hop at L2
@@ -1274,8 +1314,8 @@ out bool tx_ready)
 	    }
 	}
 
-	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
-	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
+	lb_mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
+	lb_mbr_tx_byte_counter.count((bit<10>)meta_member_id);
     }
 }
 
