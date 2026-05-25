@@ -394,12 +394,12 @@ out bool tx_ready)
     }
 
 #if !L2_IFACE_MAP_COMPAT_MODE
-    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS) packet_rx_l2_iface_drop_counter;
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS) l2_iface_drop_counter;
 #endif // L2_IFACE_MAP_COMPAT_MODE
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_iface_allow_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_allow_counter;
 
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_dst_drop_counter;
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_dst_allow_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_dst_drop_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_dst_allow_counter;
 
     apply {
 	// Assign this packet to a layer 2 sub interface
@@ -423,7 +423,7 @@ out bool tx_ready)
 	    ingress_l2_iface_id = 0;
 	    ingress_l2_iface_uc_mac = 0x000000_000000;
 #else
-	    packet_rx_l2_iface_drop_counter.count(0);
+	    l2_iface_drop_counter.count(0);
 	    drop_1();
 	    ok = false;
 	    ingress_l2_iface_id = 4w0;
@@ -434,13 +434,13 @@ out bool tx_ready)
 	}
 
 	// Packet was received on a valid, configured L2 tagged or untagged interface
-	packet_rx_l2_iface_allow_counter.count(ingress_l2_iface_id);
+	l2_iface_allow_counter.count(ingress_l2_iface_id);
 
 	// Check if this packet is destined to any of our configured unicast or
 	// multicast MAC addresses for the physical interface that it arrived on.
 	bool l2_mac_dst_hit = mac_dst_filter_table.apply().hit;
 	if (!l2_mac_dst_hit) {
-	    packet_rx_l2_dst_drop_counter.count(ingress_l2_iface_id);
+	    l2_dst_drop_counter.count(ingress_l2_iface_id);
 	    drop_1();
 	    ok = false;
 	    ingress_l2_iface_id = 4w0;
@@ -450,7 +450,7 @@ out bool tx_ready)
 	}
 
 	// Packet is destined for a configured MAC address on the ingress interface
-	packet_rx_l2_dst_allow_counter.count(ingress_l2_iface_id);
+	l2_dst_allow_counter.count(ingress_l2_iface_id);
 	ok = true;
 
 	// This layer doesn't currently fully process any of its rx'd packets
@@ -514,29 +514,29 @@ out bool tx_ready)
 	tx_ready = false;
     }
 
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_iface_drop_notip_counter;
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_l2_iface_drop_badip_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_allow_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_drop_notip_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_drop_badip_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_allow_counter;
 
 #if INCLUDE_ARP_PROC
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_ok;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_arp_tpa_nomatch;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_arp_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_arp_tpa_nomatch;
 #endif
 
 #if INCLUDE_ICMPV4_PROC
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_unhandled;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_ok;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv4_echo_dst_nomatch;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_unhandled;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_dst_nomatch;
 #endif // INCLUDE_ICMPV4_PROC
 
 #if INCLUDE_ICMPV6_PROC
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_unhandled;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_unhandled;
 
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_icmpv6_echo_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_echo_ok;
 
 #if INCLUDE_ICMPV6_ND_PROC
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_ok;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) packet_rx_l3_ipv6nd_neigh_sol_target_nomatch;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_ipv6nd_neigh_sol_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_ipv6nd_neigh_sol_target_nomatch;
 #endif // INCLUDE_ICMPV6_ND_PROC
 #endif // INCLUDE_ICMPV6_PROC
 
@@ -549,7 +549,7 @@ out bool tx_ready)
 	    !hdr.ipv6.isValid() &&
 	    !hdr.arp.isValid()) {
 	    // Not an IPv4 or IPv6 packet, no further processing
-	    packet_rx_l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
+	    l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
 	    drop_2();
 	    ingress_l3_iface_uc_ip = 128w0;
 	    ingress_lb_id = 8w0;
@@ -572,7 +572,7 @@ out bool tx_ready)
 	bool ip_dst_hit = ip_dst_filter_table.apply().hit;
 	if (!ip_dst_hit) {
 	    // Not destined to any of our IP addresses for this interface
-	    packet_rx_l2_iface_drop_badip_counter.count(ingress_l2_iface_id);
+	    l2_iface_drop_badip_counter.count(ingress_l2_iface_id);
 	    drop_2();
 	    ingress_l3_iface_uc_ip = 128w0;
 	    ingress_lb_id = 8w0;
@@ -580,7 +580,7 @@ out bool tx_ready)
 	}
 
 	// Packet is destined to a valid IP for this interface so from here, we have an LB instance context
-	packet_rx_l3_allow_counter.count(ingress_lb_id);
+	l3_allow_counter.count(ingress_lb_id);
 
 	if (false) {
 #if INCLUDE_ARP_PROC
@@ -588,7 +588,7 @@ out bool tx_ready)
 	    // Handle ARP/ND requests
 	    // Make sure this is an ARP specifically for our unicast IPv4 address
 	    if (hdr.arp.tpa != ingress_l3_iface_uc_ip[31:0]) {
-		packet_rx_l3_arp_tpa_nomatch.count(ingress_lb_id);
+		l3_arp_tpa_nomatch.count(ingress_lb_id);
 		drop_2();
 	    } else {
 		// Convert the request into a reply
@@ -604,7 +604,7 @@ out bool tx_ready)
 		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
 
-		packet_rx_l3_arp_ok.count(ingress_lb_id);
+		l3_arp_ok.count(ingress_lb_id);
 		rx_done();
 		return;
 	    }
@@ -628,7 +628,7 @@ out bool tx_ready)
 
 		// Make sure this is a unicast ping for our unicast IPv4 address
 		if (hdr.ipv4.dstAddr != ingress_l3_iface_uc_ip[31:0]) {
-		    packet_rx_l3_icmpv4_echo_dst_nomatch.count(ingress_lb_id);
+		    l3_icmpv4_echo_dst_nomatch.count(ingress_lb_id);
 		    drop_2();
 		    return;
 		} else {
@@ -660,13 +660,13 @@ out bool tx_ready)
 		    });
 		    icmp_cksum.get(hdr.icmpv4_common.checksum);
 
-		    packet_rx_l3_icmpv4_echo_ok.count(ingress_lb_id);
+		    l3_icmpv4_echo_ok.count(ingress_lb_id);
 		    rx_done();
 		    return;
 		}
 	    } else {
 		// Unhandled ICMPv4 packet type
-		packet_rx_l3_icmpv4_unhandled.count(ingress_lb_id);
+		l3_icmpv4_unhandled.count(ingress_lb_id);
 		drop_2();
 		return;
 	    }
@@ -724,7 +724,7 @@ out bool tx_ready)
 		});
 		icmp_cksum.get(hdr.icmpv6_common.checksum);
 
-		packet_rx_l3_icmpv6_echo_ok.count(ingress_lb_id);
+		l3_icmpv6_echo_ok.count(ingress_lb_id);
 		rx_done();
 		return;
 #endif // INCLUDE_ICMPV6_ECHO_PROC
@@ -736,7 +736,7 @@ out bool tx_ready)
 
 		// Make sure this is an ND solicitation for our unicast IPv6 address
 		if (hdr.ipv6nd_neigh_sol.target != ingress_l3_iface_uc_ip) {
-		    packet_rx_l3_ipv6nd_neigh_sol_target_nomatch.count(ingress_lb_id);
+		    l3_ipv6nd_neigh_sol_target_nomatch.count(ingress_lb_id);
 		    drop_2();
 		    return;
 		} else {
@@ -815,14 +815,14 @@ out bool tx_ready)
 		    });
 		    icmp_cksum.get(hdr.icmpv6_common.checksum);
 
-		    packet_rx_l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
+		    l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
 		    rx_done();
 		    return;
 		}
 #endif // INCLUDE_ICMPV6_ND_PROC
 	    } else {
 		// Unhandled ICMPv6 packet type
-		packet_rx_l3_icmpv6_unhandled.count(ingress_lb_id);
+		l3_icmpv6_unhandled.count(ingress_lb_id);
 		drop_2();
 		return;
 	    }
@@ -999,21 +999,21 @@ out bool tx_ready)
 	smeta.drop = 1;
     }
 
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.BYTES) lb_ctx_rx_byte_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_not_ip_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_no_udplb_hdr_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_rx_v2_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_rx_v3_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_bad_udplb_version_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
-    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
-    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_soft_evicted_counter;
-    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_drop_deregistered_counter;
-    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
-    Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) lb_mbr_tx_byte_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.BYTES) lb_rx_byte_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_blocked_src_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_not_ip_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_no_udplb_hdr_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v2_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v3_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_bad_udplb_version_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_epoch_assign_miss_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_lb_calendar_miss_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_mbr_info_miss_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_drop_soft_evicted_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_drop_deregistered_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) mbr_tx_byte_counter;
 
     Register<bit<64>, bit<8>>(256) src_tick;
 
@@ -1022,8 +1022,8 @@ out bool tx_ready)
 
     apply {
 	// Packets making it this far are destined for the load balancer offload path
-	lb_ctx_rx_pkt_counter.count(ingress_lb_id);
-	lb_ctx_rx_byte_counter.count(ingress_lb_id);
+	lb_rx_pkt_counter.count(ingress_lb_id);
+	lb_rx_byte_counter.count(ingress_lb_id);
 
 	//
 	// IP source filter
@@ -1038,13 +1038,13 @@ out bool tx_ready)
 		ip_src_hit = ipv6_src_filter_table.apply().hit;
 	    }
 	    if (!ip_src_hit) {
-		lb_ctx_drop_blocked_src_pkt_counter.count(ingress_lb_id);
+		lb_drop_blocked_src_pkt_counter.count(ingress_lb_id);
 		drop_3();
 		return;
 	    }
 	} else {
 	    // Drop all non-IP packets
-	    lb_ctx_drop_not_ip_pkt_counter.count(ingress_lb_id);
+	    lb_drop_not_ip_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
@@ -1054,18 +1054,18 @@ out bool tx_ready)
 	// Packets missing this header should have failed at the parser but this will double check
 	// before processing further.
 	if (!hdr.udplb_common.isValid()) {
-	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(ingress_lb_id);
+	    lb_drop_no_udplb_hdr_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
 
 	// Make sure we have a supported udplb version header
 	if (hdr.udplb_v2.isValid()) {
-	    lb_ctx_rx_v2_counter.count(ingress_lb_id);
+	    lb_rx_v2_counter.count(ingress_lb_id);
 	} else if (hdr.udplb_v3.isValid()) {
-	    lb_ctx_rx_v3_counter.count(ingress_lb_id);
+	    lb_rx_v3_counter.count(ingress_lb_id);
 	} else {
-	    lb_ctx_drop_bad_udplb_version_pkt_counter.count(ingress_lb_id);
+	    lb_drop_bad_udplb_version_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
@@ -1153,7 +1153,7 @@ out bool tx_ready)
 
 	bool epoch_assign_hit = epoch_assign_table.apply().hit;
 	if (!epoch_assign_hit) {
-	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
+	    lb_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
@@ -1182,7 +1182,7 @@ out bool tx_ready)
 
 	bool lb_calendar_hit = load_balance_calendar_table.apply().hit;
 	if (!lb_calendar_hit) {
-	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(ingress_lb_id);
+	    lb_drop_lb_calendar_miss_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
@@ -1193,19 +1193,19 @@ out bool tx_ready)
 
 	bool member_info_hit = member_info_lookup_table.apply().hit;
 	if (!member_info_hit) {
-	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
+	    lb_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
 	    drop_3();
 	    return;
 	}
 
 	if (member_drop_reason == 1) {
 	    // Found an entry, but packet was dropped due to soft-eviction
-	    lb_mbr_drop_soft_evicted_counter.count((bit<10>)meta_member_id);
+	    mbr_drop_soft_evicted_counter.count((bit<10>)meta_member_id);
 	    drop_3();
 	    return;
 	} else if (member_drop_reason == 2) {
 	    // Found an entry, but packet was dropped due to deregistered
-	    lb_mbr_drop_deregistered_counter.count((bit<10>)meta_member_id);
+	    mbr_drop_deregistered_counter.count((bit<10>)meta_member_id);
 	    drop_3();
 	    return;
 	} else {
@@ -1314,8 +1314,8 @@ out bool tx_ready)
 	    }
 	}
 
-	lb_mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
-	lb_mbr_tx_byte_counter.count((bit<10>)meta_member_id);
+	mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
+	mbr_tx_byte_counter.count((bit<10>)meta_member_id);
     }
 }
 
@@ -1331,23 +1331,23 @@ inout standard_metadata_t smeta)
     }
 
     // Raw counter of all received packets
-    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) packet_rx_counter;
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) rx_counter;
 
     // Raw counter or all received packets by physical port
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS_AND_BYTES) packet_rx_phys_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS_AND_BYTES) phys_counter;
 
     // Raw counter or all received packets by physical port
-    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) packet_rx_phys_parsefail_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_parsefail_counter;
 
     apply {
 
 	// Count all received packets and bytes
-	packet_rx_counter.count(0);
+	rx_counter.count(0);
 	// Count received packets and bytes by physical ingress port
-	packet_rx_phys_counter.count(snmeta.ingress_port);
+	phys_counter.count(snmeta.ingress_port);
 
 	if (smeta.parser_error != error.NoError) {
-	    packet_rx_phys_parsefail_counter.count(snmeta.ingress_port);
+	    phys_parsefail_counter.count(snmeta.ingress_port);
 	    drop_0();
 	    return;
 	}

@@ -40,24 +40,24 @@ LB0 ICMPv4 Echo Request Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_icmpv4_echo_ok  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv4_echo_ok  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -92,24 +92,24 @@ LB0 ICMPv4 Port Unreachable (Unhandled) Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_icmpv4_unhandled  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv4_unhandled  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -132,24 +132,24 @@ LB0 ICMPv6Echo Request Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_icmpv6_echo_ok  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv6_echo_ok  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -178,24 +178,24 @@ LB0 ARP Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_arp_ok  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_arp_ok  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -229,24 +229,24 @@ LB0 ICMPv6ND_NS Unicast Source Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_ipv6nd_neigh_sol_ok  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_ipv6nd_neigh_sol_ok  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -289,24 +289,24 @@ LB0 ICMPv6ND_NS Unspecified Source Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_ipv6nd_neigh_sol_ok  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_ipv6nd_neigh_sol_ok  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -341,9 +341,9 @@ TCP IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -367,9 +367,9 @@ TCP IPv6 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -394,9 +394,9 @@ Default UDP Port No LB Header IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -421,9 +421,9 @@ Default UDP Port No LB Header IPv6 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -448,26 +448,26 @@ Low Invalid UDP Port UDPLBv2 IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.phys_parsefail_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -492,26 +492,26 @@ High Invalid UDP Port UDPLBv2 IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.phys_parsefail_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -536,9 +536,9 @@ Invalid UDPLB version IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_parsefail_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -563,33 +563,33 @@ LB0 Default UDP Port UDPLBv2 IPv4 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -623,33 +623,33 @@ LB0 Min UDP Port UDPLBv2 IPv4 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -683,33 +683,33 @@ LB0 Max UDP Port UDPLBv2 IPv4 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -743,33 +743,33 @@ LB0 Default UDP Port UDPLBv2 IPv6 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -809,33 +809,33 @@ LB0 Random UDP Ports UDPLBv3 IPv6 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -875,33 +875,33 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  1
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  1
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  1
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  1
 
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  1
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  1
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  1
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  1
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -946,33 +946,33 @@ LB0 Checksum Sweep UDPLBv2 IPv4 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     #Packet Log Packets  ${packets_out}
@@ -1007,33 +1007,33 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_not_ip_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_no_udplb_hdr_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_drop_bad_udplb_version_pkt_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
 
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_mbr_tx_pkt_counter  0
+    P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     #Packet Log Packets  ${packets_out}
@@ -1062,25 +1062,25 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv4 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -1105,25 +1105,25 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv6 Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -1148,28 +1148,28 @@ LB0 UDPLBv3 Epoch Assign Miss Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_epoch_assign_miss_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_epoch_assign_miss_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -1194,28 +1194,28 @@ LB0 UDPLBv3 LB Calendar Miss Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_lb_calendar_miss_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_lb_calendar_miss_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -1248,28 +1248,28 @@ LB0 UDPLBv3 Member Info Miss Drop Test
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.packet_rx_phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
 
     # L2 Interface Rx Counters
-    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_iface_allow_counter  0
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
 
     # L2 MAC DA Validation Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_drop_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.packet_rx_l2_dst_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
 
     # L3 Rx Counters
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_notip_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.packet_rx_l2_iface_drop_badip_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.packet_rx_l3_allow_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # EJFAT Rx Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_pkt_counter  0
-    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_ctx_rx_v2_counter  0
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_rx_v3_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
-    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_ctx_drop_mbr_info_miss_pkt_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_mbr_info_miss_pkt_counter  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
