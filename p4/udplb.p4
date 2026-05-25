@@ -841,9 +841,9 @@ inout headers hdr,
 inout smartnic_metadata snmeta,
 inout standard_metadata_t smeta,
 in bit<48> ingress_l2_iface_uc_mac,
+in bit<128> ingress_l3_iface_uc_ip,
+in bit<8> ingress_lb_id,
 out bool ok,
-out bit<128> ingress_l3_iface_uc_ip,
-out bit<8> ingress_lb_id,
 out bool tx_ready)
 {
     //
@@ -1374,7 +1374,7 @@ inout standard_metadata_t smeta)
 #endif // INCLUDE_L3_PROC
 
 #if INCLUDE_EJFAT_PROC
-	EJFAT.apply(hdr, snmeta, smeta, ingress_l2_iface_uc_mac, ok, ingress_l3_iface_uc_ip, ingress_lb_id, tx_ready);
+	EJFAT.apply(hdr, snmeta, smeta, ingress_l2_iface_uc_mac, ingress_l3_iface_uc_ip, ingress_lb_id, ok, tx_ready);
 	if (!ok || tx_ready) return;
 #endif // INCLUDE_EJFAT_PROC
 
