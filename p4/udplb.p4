@@ -997,6 +997,8 @@ out bool tx_ready)
 
     action drop_3() {
 	smeta.drop = 1;
+	ok = false;
+	tx_ready = false;
     }
 
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_pkt_counter;
@@ -1316,6 +1318,9 @@ out bool tx_ready)
 
 	mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
 	mbr_tx_byte_counter.count((bit<10>)meta_member_id);
+
+	ok = true;
+	tx_ready = true;
     }
 }
 
