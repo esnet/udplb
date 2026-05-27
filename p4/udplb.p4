@@ -697,17 +697,10 @@ out bool tx_ready)
 		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
 		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
 
-		// Swap src and dst IPv6 addresses
-		bit<128> tmp_ip;
-		tmp_ip = hdr.ipv6.srcAddr;
-		hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
-		hdr.ipv6.dstAddr = tmp_ip;
-
-		// Make sure we always reply from our unicast IP address
-		if (hdr.ipv6.srcAddr != ingress_l3_iface_uc_ip) {
-		    // This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
-		    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
-		}
+		// Swap src and dst IPv6 addresses, ensuring that we always reply from our unicast IP
+		// Note the careful ordering of the next 2 lines so we don't clobber the srcAddr before copying it
+		hdr.ipv6.dstAddr = hdr.ipv6.srcAddr;
+		hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
 
 		// Change the type to be a reply, fixing up the header checksum
 		hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
