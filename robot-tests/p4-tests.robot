@@ -545,6 +545,126 @@ Invalid UDPLB version IPv4 Drop Test
 
     Length Should Be  ${packets_out}  0
 
+IPv4 TTL Expired Drop Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    # TTL = 0
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}  ttl=${0}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+
+    # TTL = 1
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}  ttl=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  2  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.phys_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
+
+    # EJFAT Rx Counters
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
+
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
+
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_drop_ttl_expired_pkt_counter  0
+
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  0
+
+IPv6 TTL Expired Drop Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    # TTL = 0
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB0_ALLOWED_SRC_IPV6}  dst=${LB0_UCAST_IPV6}  hlim=${0}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+
+    # TTL = 1
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB0_ALLOWED_SRC_IPV6}  dst=${LB0_UCAST_IPV6}  hlim=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_DEFAULT}
+    ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  2  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.phys_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  2  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
+
+    # EJFAT Rx Counters
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_not_ip_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_drop_bad_udplb_version_pkt_counter  0
+
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_rx_v2_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
+
+    P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_drop_ttl_expired_pkt_counter  0
+
+    P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  0
+
 LB0 Default UDP Port UDPLBv2 IPv4 Test
     [Documentation]
     ${packets_in}  Create List
@@ -670,7 +790,7 @@ LB0 Max UDP Port UDPLBv2 IPv4 Test
     ${packets_in}  Create List
 
     ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}
+    ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_ALLOWED_SRC_IPV4}  dst=${LB0_UCAST_IPV4}  ttl=${10}
     ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${LB_UDP_DST_PORT_MAX}
     ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv2  tick=${10}  entropy=${1}
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
@@ -721,6 +841,7 @@ LB0 Max UDP Port UDPLBv2 IPv4 Test
     Packet Field Equal  ${pkt}  Ethernet  dst  ${LB0_MBR0_MAC}
     Packet Field Equal  ${pkt}  IP  dst  ${LB0_MBR0_IPV4}
     Packet Field Equal  ${pkt}  IP  src  ${LB0_UCAST_IPV4}
+    Packet Field Equal  ${pkt}  IP  ttl  ${9}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${17750 + 1}
     Packet Checksums Ok  ${pkt}
@@ -862,7 +983,7 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     ${packets_in}  Create List
 
     ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
-    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB1_ALLOWED_SRC_IPV6}  dst=${LB1_UCAST_IPV6}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB1_ALLOWED_SRC_IPV6}  dst=${LB1_UCAST_IPV6}  hlim=${10}
     ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${1234}  dport=${random_port}
     ${pkt}  Packet Extend  ${pkt}  Packet UDPLBv3  tick=${16}  slotselect=${511}  portselect=${1}
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=some payload
@@ -913,6 +1034,7 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     Packet Field Equal  ${pkt}  Ethernet  dst  ${LB1_MBR0_MAC}
     Packet Field Equal  ${pkt}  IPv6  dst  ${LB1_MBR0_IPV6}
     Packet Field Equal  ${pkt}  IPv6  src  ${LB1_UCAST_IPV6}
+    Packet Field Equal  ${pkt}  IPv6  hlim  ${9}
     Packet Field Equal  ${pkt}  UDP  sport  ${1234}
     Packet Field Equal  ${pkt}  UDP  dport  ${19522}
     Packet Field Equal  ${pkt}  UDPLBShim  magic  ${0x4C42}

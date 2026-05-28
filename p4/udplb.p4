@@ -16,6 +16,8 @@
 #define INCLUDE_ICMPV6_ND_PROC   1
 #define INCLUDE_EJFAT_PROC       1
 
+#define INCLUDE_TTL_DECREMENT    1
+
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -1005,6 +1007,9 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v2_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v3_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_bad_udplb_version_pkt_counter;
+#if INCLUDE_TTL_DECREMENT
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_ttl_expired_pkt_counter;
+#endif
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_epoch_assign_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_lb_calendar_miss_pkt_counter;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_mbr_info_miss_pkt_counter;
@@ -1121,6 +1126,28 @@ out bool tx_ready)
 		hdr.udplb_v3
 	    });
 	}
+
+
+#if INCLUDE_TTL_DECREMENT
+	if ((hdr.ipv4.isValid() && hdr.ipv4.ttl <= 1) ||
+	    (hdr.ipv6.isValid() && hdr.ipv6.hopLimit <= 1)) {
+	    // TTL has expired.  Drop the packet.
+	    lb_drop_ttl_expired_pkt_counter.count(ingress_lb_id);
+	    drop_3();
+	    return;
+	}
+
+	// TTL has not expired, decrement it
+	if (hdr.ipv4.isValid()) {
+	    // TTL has not expired, decrement it
+	    bit<8> ttl = hdr.ipv4.ttl;
+	    hdr.ipv4.ttl = ttl - 1;
+	} else if (hdr.ipv6.isValid()) {
+	    // TTL has not expired, decrement it
+	    bit<8> hopLimit = hdr.ipv6.hopLimit;
+	    hdr.ipv6.hopLimit = hopLimit - 1;
+	}
+#endif
 
 	// All packets must be originated with our assigned unicast MAC address
 
