@@ -1,6 +1,23 @@
 #include <core.p4>
 #include <xsa.p4>
 
+// Temporarily operate in a compatibility mode where a miss in the L2 interface map simply
+// assigns the packet into L2 interface 0 with an undefined UC MAC, expecting the old control
+// plane code to be unaware of multiple L2 interfaces, and also to assign the UC MAC in the MAC
+// DA lookup table rather than in the L2 interface map table.
+#define L2_IFACE_MAP_COMPAT_MODE 1
+
+#define INCLUDE_L2_PROC          1
+#define INCLUDE_L3_PROC          1
+#define INCLUDE_ARP_PROC         1
+#define INCLUDE_ICMPV4_PROC      1
+#define INCLUDE_ICMPV6_PROC      1
+#define INCLUDE_ICMPV6_ECHO_PROC 1
+#define INCLUDE_ICMPV6_ND_PROC   1
+#define INCLUDE_EJFAT_PROC       1
+
+#define INCLUDE_TTL_DECREMENT    1
+
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -19,6 +36,13 @@ struct smartnic_metadata {
 header ethernet_t {
     bit<48> dstAddr;
     bit<48> srcAddr;
+    bit<16> etherType;
+}
+
+header vlan_t {
+    bit<3>  pcp;
+    bit<1>  cfi;
+    bit<12> vid;
     bit<16> etherType;
 }
 
@@ -143,6 +167,7 @@ header udplb_v3_t {
 
 struct headers {
     ethernet_t              ethernet;
+    vlan_t                  vlan;
     arp_t                   arp;
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
@@ -185,8 +210,18 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
         transition select(hdr.ethernet.etherType) {
             16w0x0800: parse_ipv4;
 	    16w0x0806: parse_arp;
+            16w0x8100: parse_dot1q; // 802.1q C-tag
             16w0x86dd: parse_ipv6;
         }
+    }
+
+    state parse_dot1q {
+	packet.extract(hdr.vlan);
+	transition select(hdr.vlan.etherType) {
+            16w0x0800: parse_ipv4;
+	    16w0x0806: parse_arp;
+            16w0x86dd: parse_ipv6;
+	}
     }
 
     state parse_arp {
@@ -256,6 +291,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	packet.extract(hdr.icmpv4_common);
 	transition select(hdr.icmpv4_common.msg_type_code) {
 	    8w8 ++ 8w0: parse_icmpv4_echo;
+	    default: accept;	// Will be rejected during packet processing
 	}
     }
 
@@ -267,7 +303,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_udp {
         packet.extract(hdr.udp);
 	transition select(hdr.udp.dstPort) {
-	  16w0x4000 &&& 16w0xC000: parse_udplb_common;
+	    16w0x4000 &&& 16w0xC000: parse_udplb_common;
+	    default: accept;	// Will be rejected during packet processing
 	}
     }
 
@@ -291,135 +328,556 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     }
 }
 
-control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
+#if INCLUDE_L2_PROC
 
-    // Raw counter of all received packets
-    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) packet_rx_counter;
+control L2IfaceMap(
+inout headers hdr,
+inout smartnic_metadata snmeta,
+inout standard_metadata_t smeta,
+out bool ok,
+out bit<4> ingress_l2_iface_id,
+out bit<48> ingress_l2_iface_uc_mac,
+out bool tx_ready)
+{
+    //
+    // VLANInterface
+    //
 
-    // Counter block to count the types of Rx'd packets
-    Counter<bit<64>, bit<4>>(14, CounterType_t.PACKETS) rx_rslt_counter;
-    const bit<4> rx_rslt_drop_parse_fail                  = 0;
-    const bit<4> rx_rslt_drop_mac_dst_miss                = 1;
-    const bit<4> rx_rslt_drop_not_ip                      = 2;
-    const bit<4> rx_rslt_drop_ip_dst_miss                 = 3;
-    const bit<4> rx_rslt_drop_arp_bad_tpa                 = 4;
-    const bit<4> rx_rslt_drop_icmpv4_echo_bad_dst         = 5;
-    //const bit<4> rx_rslt_drop_icmpv6_echo_bad_dst         = 6;
-    const bit<4> rx_rslt_drop_ipv6nd_neigh_sol_bad_target = 7;
-    const bit<4> rx_rslt_ok_arp_req                       = 8;
-    const bit<4> rx_rslt_ok_icmpv4_echo                   = 9;
-    const bit<4> rx_rslt_ok_icmpv6_echo                   = 10;
-    const bit<4> rx_rslt_ok_ipv6nd_neigh_sol              = 11;
-    //const bit<4> rx_rslt_ok_host                          = 12;
-    const bit<4> rx_rslt_ok_lb                            = 13;
+    // Normalized VID with 0 meaning untagged or priority tagged
+    bit<12> vlan_id;
 
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.BYTES)   lb_ctx_rx_byte_counter;
+    action set_l2_iface(bit<4> l2_iface_id, bit<48> l2_iface_uc_mac) {
+	ingress_l2_iface_id = l2_iface_id;
+	ingress_l2_iface_uc_mac = l2_iface_uc_mac;
+    }
 
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_blocked_src_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_not_ip_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_no_udplb_hdr_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_bad_udplb_version_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_epoch_assign_miss_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_lb_calendar_miss_pkt_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_drop_mbr_info_miss_pkt_counter;
-
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_v2_counter;
-    Counter<bit<64>, bit<3>>(8, CounterType_t.PACKETS) lb_ctx_rx_v3_counter;
-
-    Counter<bit<64>, bit<13>>(8192, CounterType_t.PACKETS) lb_mbr_tx_pkt_counter;
-    Counter<bit<64>, bit<13>>(8192, CounterType_t.BYTES)   lb_mbr_tx_byte_counter;
-
-    InternetChecksum() l3_cksum;
-    InternetChecksum() l4_cksum;
+    table l2_iface_table {
+	actions = {
+	    set_l2_iface;
+	}
+	key = {
+	    vlan_id : field_mask;
+	}
+	size = 17;  // 16 l2 sub interfaces + wildcard
+    }
 
     //
     // MacDstFilter
     //
 
-    bit<128> meta_ip_da = 0;
-    bit<48>  meta_mac_sa = 0;
-    bit<128> meta_ip_sa = 0;
-    bit<3>   meta_lb_id = 0;
-
-    action drop() {
-	smeta.drop = 1;
+    // Deprecated action -- use l2_dst_allow
+    // Old control plane software will use this action to
+    // set the unicast MAC addr for this layer 2 interface.
+    // New control plane software should add entries to the
+    // l2_interface_table and use the l2_dst_allow action
+    // in this table.
+    action set_mac_sa(bit<48> mac_sa) {
+	ingress_l2_iface_uc_mac = mac_sa;
     }
 
-    action set_mac_sa(bit<48> mac_sa) {
-	meta_mac_sa = mac_sa;
-        snmeta.egress_port = snmeta.ingress_port;
+    action l2_dst_allow() {
+	// MAC DA matched an expected unicast or multicast MAC address for this L2 interface
     }
 
     table mac_dst_filter_table {
 	actions = {
-	    drop;
 	    set_mac_sa;
+	    l2_dst_allow;
 	}
 	key = {
-	    snmeta.ingress_port : field_mask;
+	    ingress_l2_iface_id : field_mask;
 	    hdr.ethernet.dstAddr : exact;
 	}
 	size = 64;
-	default_action = drop;
     }
+
+    action drop_1() {
+	smeta.drop = 1;
+    }
+
+#if !L2_IFACE_MAP_COMPAT_MODE
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS) l2_iface_drop_counter;
+#endif // L2_IFACE_MAP_COMPAT_MODE
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_allow_counter;
+
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_dst_drop_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_dst_allow_counter;
+
+    apply {
+	// Assign this packet to a layer 2 sub interface
+
+	// Normalize untagged and tagged packets to a common vlan_id space
+	// with untagged packets being assigned to vlan_id 0
+	if (hdr.vlan.isValid()) {
+	    // VLAN tagged packet
+	    vlan_id = hdr.vlan.vid;
+	    // Mark the VLAN header as invalid (pop it) now that we've processed it.
+	    // If a tag is required again at egress, it will be pushed there.
+	    hdr.vlan.setInvalid();
+	} else {
+	    // Untagged packet, use VID 0
+	    vlan_id = 0;
+	}
+
+	// Silence uninit warnings but init to unlikely values
+	ingress_l2_iface_id = 15;
+	ingress_l2_iface_uc_mac = 0x000000_000000;
+
+	bool l2_iface_hit = l2_iface_table.apply().hit;
+	if (!l2_iface_hit) {
+#if L2_IFACE_MAP_COMPAT_MODE
+	    // Override L2 interface to be backward compatible with previous control plane SW
+	    ingress_l2_iface_id = 0;
+	    ingress_l2_iface_uc_mac = 0x000000_000000;
+#else
+	    l2_iface_drop_counter.count(0);
+	    drop_1();
+	    ok = false;
+	    tx_ready = false;
+	    return;
+#endif
+	}
+
+	// Packet was received on a valid, configured L2 tagged or untagged interface
+	l2_iface_allow_counter.count(ingress_l2_iface_id);
+
+	// Check if this packet is destined to any of our configured unicast or
+	// multicast MAC addresses for the physical interface that it arrived on.
+	bool l2_mac_dst_hit = mac_dst_filter_table.apply().hit;
+	if (!l2_mac_dst_hit) {
+	    l2_dst_drop_counter.count(ingress_l2_iface_id);
+	    drop_1();
+	    ok = false;
+	    ingress_l2_iface_id = 4w0;
+	    ingress_l2_iface_uc_mac = 48w0;
+	    tx_ready = false;
+	    return;
+	}
+
+	// Packet is destined for a configured MAC address on the ingress interface
+	l2_dst_allow_counter.count(ingress_l2_iface_id);
+	ok = true;
+
+	// This layer doesn't currently fully process any of its rx'd packets
+	tx_ready = false;
+
+	return;
+    }
+}
+
+#endif // INCLUDE_L2_PROC
+
+#if INCLUDE_L3_PROC
+
+control L3IfaceMap(
+inout headers hdr,
+inout smartnic_metadata snmeta,
+inout standard_metadata_t smeta,
+in bit<4> ingress_l2_iface_id,
+in bit<48> ingress_l2_iface_uc_mac,
+out bool ok,
+out bit<128> ingress_l3_iface_uc_ip,
+out bit<8> ingress_lb_id,
+out bool tx_ready)
+{
+    bit<128> meta_ip_da = 0;
 
     //
     // IPDstFilter
     //
 
     action set_ip_sa(bit<128> ip_sa, bit<3> lb_id) {
-	meta_ip_sa = ip_sa;
-	meta_lb_id = lb_id;
-        snmeta.egress_port = snmeta.ingress_port;
+	ingress_l3_iface_uc_ip = ip_sa;
+	ingress_lb_id = 5w0 ++ lb_id;
     }
 
     table ip_dst_filter_table {
 	actions = {
-	    drop;
 	    set_ip_sa;
 	}
 	key = {
-	    snmeta.ingress_port : field_mask;
+	    ingress_l2_iface_id : field_mask;
 	    hdr.ethernet.etherType : exact;
 	    meta_ip_da : exact;
 	}
 	size = 64;
-	default_action = drop;
     }
 
+    action drop_2() {
+	smeta.drop = 1;
+	ok = false;
+	tx_ready = false;
+    }
+
+    action rx_done() {
+	ok = true;
+	tx_ready = true;
+    }
+
+    action rx_continue() {
+	ok = true;
+	tx_ready = false;
+    }
+
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_drop_notip_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) l2_iface_drop_badip_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_allow_counter;
+
+#if INCLUDE_ARP_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_arp_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_arp_tpa_nomatch;
+#endif
+
+#if INCLUDE_ICMPV4_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_unhandled;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_dst_nomatch;
+#endif // INCLUDE_ICMPV4_PROC
+
+#if INCLUDE_ICMPV6_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_unhandled;
+
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_echo_ok;
+
+#if INCLUDE_ICMPV6_ND_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_ipv6nd_neigh_sol_ok;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_ipv6nd_neigh_sol_target_nomatch;
+#endif // INCLUDE_ICMPV6_ND_PROC
+#endif // INCLUDE_ICMPV6_PROC
+
+#if INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
+    InternetChecksum() icmp_cksum;
+#endif // INCLUDE_ICMPV4_PROC || INCLUDE_ICMPV6_PROC
+
+    apply {
+	// Silence uninit warnings but init to unlikely values
+	ingress_lb_id = 15;
+	ingress_l3_iface_uc_ip = 128w0;
+
+	if (!hdr.ipv4.isValid() &&
+	    !hdr.ipv6.isValid() &&
+	    !hdr.arp.isValid()) {
+	    // Not an IPv4 or IPv6 packet, no further processing
+	    l2_iface_drop_notip_counter.count(ingress_l2_iface_id);
+	    drop_2();
+	    return;
+	}
+
+	//
+	// IPDstFilter
+	//
+
+	// Normalize the IP destination address
+	if (hdr.ipv4.isValid()) {
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
+	} else if (hdr.ipv6.isValid()) {
+	    meta_ip_da = hdr.ipv6.dstAddr;
+	} else if (hdr.arp.isValid()) {
+	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
+	}
+
+	bool ip_dst_hit = ip_dst_filter_table.apply().hit;
+	if (!ip_dst_hit) {
+	    // Not destined to any of our IP addresses for this interface
+	    l2_iface_drop_badip_counter.count(ingress_l2_iface_id);
+	    drop_2();
+	    return;
+	}
+
+	// Packet is destined to a valid IP for this interface so from here, we have an LB instance context
+	l3_allow_counter.count(ingress_lb_id);
+
+	if (false) {
+#if INCLUDE_ARP_PROC
+	} else if (hdr.arp.isValid()) {
+	    // Handle ARP/ND requests
+	    // Make sure this is an ARP specifically for our unicast IPv4 address
+	    if (hdr.arp.tpa != ingress_l3_iface_uc_ip[31:0]) {
+		l3_arp_tpa_nomatch.count(ingress_lb_id);
+		drop_2();
+	    } else {
+		// Convert the request into a reply
+		hdr.arp.oper = 2;
+		// Swap sender/target HW address and fill in our unicast MAC as the sha
+		hdr.arp.tha = hdr.arp.sha;
+		hdr.arp.sha = ingress_l2_iface_uc_mac;
+		// Swap sender/target IP addresses
+		hdr.arp.tpa = hdr.arp.spa;
+		hdr.arp.spa = ingress_l3_iface_uc_ip[31:0];
+
+		// Send the ethernet frame back to the originator
+		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
+
+		l3_arp_ok.count(ingress_lb_id);
+		rx_done();
+		return;
+	    }
+#endif // INCLUDE_ARP_PROC
+#if INCLUDE_ICMPV4_PROC
+	} else if (hdr.icmpv4_common.isValid()) {
+	    if (hdr.icmpv4_echo.isValid()) {
+		// Remove the old headers from the checksum
+		icmp_cksum.clear();
+		icmp_cksum.subtract({
+		    // IPv4 pseudo-header
+		    hdr.ipv4.srcAddr,
+		    hdr.ipv4.dstAddr,
+		    hdr.ipv4.totalLen,
+		    8w0 ++ hdr.ipv4.protocol,
+		    // ICMPv4 common header (including previous checksum)
+		    hdr.icmpv4_common,
+		    // ICMPv4 echo header
+		    hdr.icmpv4_echo
+		});
+
+		// Make sure this is a unicast ping for our unicast IPv4 address
+		if (hdr.ipv4.dstAddr != ingress_l3_iface_uc_ip[31:0]) {
+		    l3_icmpv4_echo_dst_nomatch.count(ingress_lb_id);
+		    drop_2();
+		    return;
+		} else {
+		    // Update our ethernet header
+		    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+		    hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
+
+		    // Update our ipv4 header addresses
+		    // Note: since we're swapping src/dst here, no need to change the IPv4 header checksum
+		    // TODO: should we be resetting the TTL on our replies?  Probably yes but that will require checksum fixup
+		    hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
+		    hdr.ipv4.srcAddr = ingress_l3_iface_uc_ip[31:0];
+
+		    // Change the type to be a reply, fixing up the header checksum
+		    hdr.icmpv4_common.msg_type_code = 8w0 ++ 8w0;   // Echo Reply
+
+		    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
+		    hdr.icmpv4_common.checksum = 0;
+		    icmp_cksum.add({
+			// IPv6 pseudo-header
+			hdr.ipv4.srcAddr,
+			hdr.ipv4.dstAddr,
+			hdr.ipv4.totalLen,
+			8w0 ++ hdr.ipv4.protocol,
+			// ICMPv4 common header fields
+			hdr.icmpv4_common,
+			// ICMPv4 echo header fields
+			hdr.icmpv4_echo
+		    });
+		    icmp_cksum.get(hdr.icmpv4_common.checksum);
+
+		    l3_icmpv4_echo_ok.count(ingress_lb_id);
+		    rx_done();
+		    return;
+		}
+	    } else {
+		// Unhandled ICMPv4 packet type
+		l3_icmpv4_unhandled.count(ingress_lb_id);
+		drop_2();
+		return;
+	    }
+#endif // INCLUDE_ICMPV4_PROC
+#if INCLUDE_ICMPV6_PROC
+	} else if (hdr.icmpv6_common.isValid()) {
+	    if (false) {
+#if INCLUDE_ICMPV6_ECHO_PROC
+	    } else if (hdr.icmpv6_echo.isValid()) {
+		// Remove the old headers from the checksum
+		icmp_cksum.clear();
+		icmp_cksum.subtract({
+		    // IPv6 pseudo-header
+		    hdr.ipv6.srcAddr,
+		    hdr.ipv6.dstAddr,
+		    16w0 ++ hdr.ipv6.payloadLen,
+		    24w0 ++ hdr.ipv6.nextHdr,
+		    // ICMPv6 common header (including previous checksum)
+		    hdr.icmpv6_common,
+		    // ICMPv6 echo header
+		    hdr.icmpv6_echo
+		});
+
+		// Update our ethernet header
+		hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+		hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
+
+		// Swap src and dst IPv6 addresses, ensuring that we always reply from our unicast IP
+		// Note the careful ordering of the next 2 lines so we don't clobber the srcAddr before copying it
+		hdr.ipv6.dstAddr = hdr.ipv6.srcAddr;
+		hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
+
+		// Change the type to be a reply, fixing up the header checksum
+		hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
+
+		// Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
+		hdr.icmpv6_common.checksum = 0;
+		icmp_cksum.add({
+		    // IPv6 pseudo-header
+		    hdr.ipv6.srcAddr,
+		    hdr.ipv6.dstAddr,
+		    16w0 ++ hdr.ipv6.payloadLen,
+		    24w0 ++ hdr.ipv6.nextHdr,
+		    // ICMP common header fields
+		    hdr.icmpv6_common,
+		    // ICMPv6 echo header
+		    hdr.icmpv6_echo
+		});
+		icmp_cksum.get(hdr.icmpv6_common.checksum);
+
+		l3_icmpv6_echo_ok.count(ingress_lb_id);
+		rx_done();
+		return;
+#endif // INCLUDE_ICMPV6_ECHO_PROC
+#if INCLUDE_ICMPV6_ND_PROC
+	    } else if (hdr.ipv6nd_neigh_sol.isValid()) {
+		bit<128> new_ip_da;
+		bit<48>  new_mac_da;
+		bit<1>   solicited;
+
+		// Make sure this is an ND solicitation for our unicast IPv6 address
+		if (hdr.ipv6nd_neigh_sol.target != ingress_l3_iface_uc_ip) {
+		    l3_ipv6nd_neigh_sol_target_nomatch.count(ingress_lb_id);
+		    drop_2();
+		    return;
+		} else {
+		    // Figure out what our destination addresses should be based on the type of query we've received
+		    if (hdr.ipv6.srcAddr == 128w0) {
+			// Source is the unspecified address so reply to the all-nodes multicast IP and clear solicited flag
+			new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
+			new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
+			solicited = 0;
+		    } else {
+			// Reply to the originating source IP and set the solicited flag
+			new_ip_da = hdr.ipv6.srcAddr;
+
+			if (hdr.ipv6nd_option_lladdr.isValid()) {
+			    // The request includes a link-layer address for the originator, reply to that
+			    new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
+			} else {
+			    // No link-layer address option, reply to the unicast MAC from the original frame
+			    new_mac_da = hdr.ethernet.srcAddr;
+			}
+			solicited = 1;
+		    }
+
+		    // Update our ethernet header addresses
+		    hdr.ethernet.dstAddr = new_mac_da;
+		    hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
+
+		    // Update our ipv6 header addresses
+		    hdr.ipv6.dstAddr = new_ip_da;
+		    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
+
+		    // Reset our hop limit
+		    hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
+
+		    // Set our new payload length
+		    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
+
+		    // Fill out the ICMPv6 common header
+		    hdr.icmpv6_common.setValid();
+		    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
+		    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
+
+		    // Fill out our ND advertisement
+		    hdr.ipv6nd_neigh_adv.setValid();
+		    hdr.ipv6nd_neigh_adv.router_flag    = 0;
+		    hdr.ipv6nd_neigh_adv.solicited_flag = solicited;
+		    hdr.ipv6nd_neigh_adv.override_flag  = 0;
+		    hdr.ipv6nd_neigh_adv.rsvd           = 0;
+		    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
+
+		    // Fill out the ND advertisement option common header
+		    hdr.ipv6nd_adv_option_common.setValid();
+		    hdr.ipv6nd_adv_option_common.option_type   = 2;   // Target Link-Layer Address
+		    hdr.ipv6nd_adv_option_common.length        = 1;
+
+		    // Fill out the ND advertisement lladdr common header
+		    hdr.ipv6nd_adv_option_lladdr.setValid();
+		    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = ingress_l2_iface_uc_mac;
+
+		    // Calculate the checksum over the pseudo header + payload
+		    icmp_cksum.clear();
+		    icmp_cksum.add({
+			// IPv6 pseudo-header
+			hdr.ipv6.srcAddr,
+			hdr.ipv6.dstAddr,
+			16w0 ++ hdr.ipv6.payloadLen,
+			24w0 ++ hdr.ipv6.nextHdr,
+			// ICMP common header fields
+			hdr.icmpv6_common,
+			// ICMP neighbour advertisement header
+			hdr.ipv6nd_neigh_adv,
+			// ICMP neighbour advertisement option common header fields
+			hdr.ipv6nd_adv_option_common,
+			// ICMP neighbour advertisement LLADDR header fields
+			hdr.ipv6nd_adv_option_lladdr
+		    });
+		    icmp_cksum.get(hdr.icmpv6_common.checksum);
+
+		    l3_ipv6nd_neigh_sol_ok.count(ingress_lb_id);
+		    rx_done();
+		    return;
+		}
+#endif // INCLUDE_ICMPV6_ND_PROC
+	    } else {
+		// Unhandled ICMPv6 packet type
+		l3_icmpv6_unhandled.count(ingress_lb_id);
+		drop_2();
+		return;
+	    }
+#endif // INCLUDE_ICMPV6_PROC
+	}
+	rx_continue();
+	return;
+    }
+}
+#endif // INCLUDE_L3_PROC
+
+#if INCLUDE_EJFAT_PROC
+
+control EJFAT(
+inout headers hdr,
+inout smartnic_metadata snmeta,
+inout standard_metadata_t smeta,
+in bit<48> ingress_l2_iface_uc_mac,
+in bit<128> ingress_l3_iface_uc_ip,
+in bit<8> ingress_lb_id,
+out bool ok,
+out bool tx_ready)
+{
     //
     // IPSrcFilter
     //
+
+    bit<8> meta_src_id = 0;
 
     action allow_ip_src() {
 	// Nothing to do here, basically a no-op
     }
 
+    action allow_ip_src_with_id(bit<8>src_id) {
+	meta_src_id = src_id;
+    }
+
     table ipv4_src_filter_table {
 	actions = {
-	    drop;
 	    allow_ip_src;
 	}
 	key = {
-	    meta_lb_id : exact;
+	    ingress_lb_id : exact;
 	    hdr.ipv4.srcAddr : exact;
 	}
 	size = 256;
-	default_action = drop;
     }
 
     table ipv6_src_filter_table {
 	actions = {
-	    drop;
 	    allow_ip_src;
 	}
 	key = {
-	    meta_lb_id : exact;
+	    ingress_lb_id : exact;
 	    hdr.ipv6.srcAddr : exact;
 	}
 	size = 256;
-	default_action = drop;
     }
 
     //
@@ -430,7 +888,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     bit<32> meta_epoch = 0;
     bit<5> meta_slot_select_bit_cnt = 0;
     bit<16> meta_slot_select_xor = 0;
-    
+
     action do_assign_epoch(bit<32> epoch) {
 	meta_epoch = epoch;
 	meta_slot_select_bit_cnt = 9;
@@ -447,14 +905,12 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	actions = {
 	    do_assign_epoch;
 	    do_assign_epoch_with_slot_sel_opts;
-	    drop;
 	}
 	key = {
-	    meta_lb_id : exact;
+	    ingress_lb_id : exact;
 	    tick : lpm;
 	}
 	size = 1024;
-	default_action = drop;
     }
 
     //
@@ -471,17 +927,15 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     table load_balance_calendar_table {
 	actions = {
 	    do_assign_member;
-	    drop;
 	}
 	key = {
-	    meta_lb_id : exact;
+	    ingress_lb_id : exact;
 	    meta_epoch : exact;
 	    calendar_slot : exact;
 	}
 	size = 16384;
-	default_action = drop;
     }
-    
+
     //
     // MemberInfoLookup
     //
@@ -492,6 +946,7 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
     bit<16>  meta_udp_base            = 0;
     bit<5>   meta_port_select_bit_cnt = 0;
     bool     meta_keep_lb_header      = false;
+    bit<2>   member_drop_reason       = 0;  // default to not dropped
 
     action do_ipv4_member_rewrite(bit<48> mac_dst, bit<32> ip_dst, bit<16> udp_base, bit<5> port_select_bit_cnt, bit<1> keep_lb_header) {
 	new_mac_dst              = mac_dst;
@@ -509,314 +964,91 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	meta_keep_lb_header      = (keep_lb_header == 1w1);
     }
 
+    action drop_soft_evicted() {
+	member_drop_reason = 1;
+    }
+
+    action drop_deregistered() {
+	member_drop_reason = 2;
+    }
+
+    // Deprecated action for backward compatibility only
+    // Use more specific "drop_soft_evicted" or "drop_deregistered" action
+    action drop() {
+    }
+
     table member_info_lookup_table {
 	actions = {
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
 	    drop;
+	    drop_soft_evicted;
+	    drop_deregistered;
 	}
 	key = {
-	    meta_lb_id : exact;
+	    ingress_lb_id : exact;
 	    hdr.ethernet.etherType : exact;
 	    meta_member_id : exact;
 	}
-	size = 8192;
-	default_action = drop;
+	size = 1024;
     }
 
-    // Entry Point
+    action drop_3() {
+	smeta.drop = 1;
+	ok = false;
+	tx_ready = false;
+    }
+
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.BYTES) lb_rx_byte_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_blocked_src_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_not_ip_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_no_udplb_hdr_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v2_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_rx_v3_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_bad_udplb_version_pkt_counter;
+#if INCLUDE_TTL_DECREMENT
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_ttl_expired_pkt_counter;
+#endif
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_epoch_assign_miss_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_lb_calendar_miss_pkt_counter;
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) lb_drop_mbr_info_miss_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_drop_soft_evicted_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_drop_deregistered_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.PACKETS) mbr_tx_pkt_counter;
+    Counter<bit<64>, bit<10>>(1024, CounterType_t.BYTES) mbr_tx_byte_counter;
+
+    Register<bit<64>, bit<8>>(256) src_tick;
+
+    InternetChecksum() l3_cksum;
+    InternetChecksum() l4_cksum;
+
     apply {
-	bool hit;
-
-	// Count all received packets and bytes
-	packet_rx_counter.count(0);
-
-	// Drop all packets that failed the parse stage
-	if (smeta.parser_error != error.NoError) {
-	    rx_rslt_counter.count(rx_rslt_drop_parse_fail);
-	    drop();
-	    return;
-	}
-
-	//
-	// MacDstFilter
-	//
-
-	hit = mac_dst_filter_table.apply().hit;
-	if (!hit) {
-	    rx_rslt_counter.count(rx_rslt_drop_mac_dst_miss);
-	    return;
-	}
-
-	//
-	// IPDstFilter
-	//
-
-	// Normalize the IP destination address
-	if (hdr.ipv4.isValid()) {
-	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.ipv4.dstAddr;
-	} else if (hdr.ipv6.isValid()) {
-	    meta_ip_da = hdr.ipv6.dstAddr;
-	} else if (hdr.arp.isValid()) {
-	    meta_ip_da = (bit<96>) 0 ++ (bit<32>) hdr.arp.tpa;
-	} else {
-	    rx_rslt_counter.count(rx_rslt_drop_not_ip);
-	    drop();
-	    return;
-	}
-
-	hit = ip_dst_filter_table.apply().hit;
-	if (!hit) {
-	    rx_rslt_counter.count(rx_rslt_drop_ip_dst_miss);
-	    return;
-	}
-
-	if (false) {
-	// Handle ARP/ND requests
-	} else if (hdr.arp.isValid()) {
-	    // Make sure this is an ARP specifically for our unicast IPv4 address
-	    if (hdr.arp.tpa != meta_ip_sa[31:0]) {
-		rx_rslt_counter.count(rx_rslt_drop_arp_bad_tpa);
-		drop();
-		return;
-	    }
-
-	    // Convert the request into a reply
-	    hdr.arp.oper = 2;
-	    // Swap sender/target HW address and fill in our unicast MAC as the sha
-	    hdr.arp.tha = hdr.arp.sha;
-	    hdr.arp.sha = meta_mac_sa;
-	    // Swap sender/target IP addresses
-	    hdr.arp.tpa = hdr.arp.spa;
-	    hdr.arp.spa = meta_ip_sa[31:0];
-
-	    // Send the ethernet frame back to the originator
-	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-	    hdr.ethernet.srcAddr = meta_mac_sa;
-
-	    rx_rslt_counter.count(rx_rslt_ok_arp_req);
-	    return;
-	} else if (hdr.icmpv4_echo.isValid()) {
-	    // Remove the old headers from the checksum
-	    l4_cksum.clear();
-	    l4_cksum.subtract({
-		// IPv4 pseudo-header
-		hdr.ipv4.srcAddr,
-		hdr.ipv4.dstAddr,
-		hdr.ipv4.totalLen,
-		8w0 ++ hdr.ipv4.protocol,
-		// ICMPv4 common header (including previous checksum)
-		hdr.icmpv4_common,
-		// ICMPv4 echo header
-		hdr.icmpv4_echo
-	    });
-
-	    // Make sure this is a unicast ping for our unicast IPv4 address
-	    if (hdr.ipv4.dstAddr != meta_ip_sa[31:0]) {
-		rx_rslt_counter.count(rx_rslt_drop_icmpv4_echo_bad_dst);
-		drop();
-		return;
-	    }
-
-	    // Update our ethernet header
-	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-	    hdr.ethernet.srcAddr = meta_mac_sa;
-
-	    // Update our ipv4 header addresses
-	    // Note: since we're swapping src/dst here, no need to change the IPv4 header checksum
-	    // TODO: should we be resetting the TTL on our replies?  Probably yes but that will require checksum fixup
-	    hdr.ipv4.dstAddr = hdr.ipv4.srcAddr;
-	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
-
-	    // Change the type to be a reply, fixing up the header checksum
-	    hdr.icmpv4_common.msg_type_code = 8w0 ++ 8w0;   // Echo Reply
-
-	    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
-	    hdr.icmpv4_common.checksum = 0;
-	    l4_cksum.add({
-		// IPv6 pseudo-header
-		hdr.ipv4.srcAddr,
-		hdr.ipv4.dstAddr,
-		hdr.ipv4.totalLen,
-		8w0 ++ hdr.ipv4.protocol,
-		// ICMPv4 common header fields
-		hdr.icmpv4_common,
-		// ICMPv4 echo header fields
-		hdr.icmpv4_echo
-	    });
-	    l4_cksum.get(hdr.icmpv4_common.checksum);
-
-	    rx_rslt_counter.count(rx_rslt_ok_icmpv4_echo);
-	    return;
-        } else if (hdr.icmpv6_echo.isValid()) {
-	    // Remove the old headers from the checksum
-	    l4_cksum.clear();
-	    l4_cksum.subtract({
-		// IPv6 pseudo-header
-		hdr.ipv6.srcAddr,
-		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
-		24w0 ++ hdr.ipv6.nextHdr,
-		// ICMPv6 common header (including previous checksum)
-		hdr.icmpv6_common,
-		// ICMPv6 echo header
-		hdr.icmpv6_echo
-	    });
-
-	    // Update our ethernet header
-	    hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
-	    hdr.ethernet.srcAddr = meta_mac_sa;
-
-	    // Swap src and dst IPv6 addresses
-	    bit<128> tmp_ip;
-	    tmp_ip = hdr.ipv6.srcAddr;
-	    hdr.ipv6.srcAddr = hdr.ipv6.dstAddr;
-	    hdr.ipv6.dstAddr = tmp_ip;
-
-	    // Make sure we always reply from our unicast IP address
-	    if (hdr.ipv6.srcAddr != meta_ip_sa) {
-		// This was sent to a multicast IP that we listen on, fix to reply from our unicast IP
-		hdr.ipv6.srcAddr = meta_ip_sa;
-	    }
-
-            // Change the type to be a reply, fixing up the header checksum
-	    hdr.icmpv6_common.msg_type_code = 8w129 ++ 8w0;   // Echo Reply
-
-	    // Add in the new pseudo header and ICMP headers after zero'ing out the previous checksum
-	    hdr.icmpv6_common.checksum = 0;
-	    l4_cksum.add({
-		// IPv6 pseudo-header
-		hdr.ipv6.srcAddr,
-		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
-		24w0 ++ hdr.ipv6.nextHdr,
-		// ICMP common header fields
-		hdr.icmpv6_common,
-		// ICMPv6 echo header
-		hdr.icmpv6_echo
-	    });
-	    l4_cksum.get(hdr.icmpv6_common.checksum);
-
-	    rx_rslt_counter.count(rx_rslt_ok_icmpv6_echo);
-	    return;
-	} else if (hdr.ipv6nd_neigh_sol.isValid()) {
-	    bit<128> new_ip_da;
-	    bit<48>  new_mac_da;
-	    bit<1>   solicited;
-
-	    // Make sure this is an ND solicitation for our unicast IPv6 address
-	    if (hdr.ipv6nd_neigh_sol.target != meta_ip_sa) {
-		rx_rslt_counter.count(rx_rslt_drop_ipv6nd_neigh_sol_bad_target);
-		drop();
-		return;
-	    }
-
-	    // Figure out what our destination addresses should be based on the type of query we've received
-	    if (hdr.ipv6.srcAddr == 128w0) {
-		// Source is the unspecified address so reply to the all-nodes multicast IP and clear solicited flag
-		new_ip_da = 0xff02_0000_0000_0000_0000_0000_0000_0001;  // ff02::1
-		new_mac_da = 0x3333_0000_0001;  // 33:33:00:00:00:01
-		solicited = 0;
-	    } else {
-		// Reply to the originating source IP and set the solicited flag
-		new_ip_da = hdr.ipv6.srcAddr;
-
-		if (hdr.ipv6nd_option_lladdr.isValid()) {
-		    // The request includes a link-layer address for the originator, reply to that
-		    new_mac_da = hdr.ipv6nd_option_lladdr.ethernet_addr;
-		} else {
-		    // No link-layer address option, reply to the unicast MAC from the original frame
-		    new_mac_da = hdr.ethernet.srcAddr;
-		}
-		solicited = 1;
-	    }
-
-	    // Update our ethernet header addresses
-	    hdr.ethernet.dstAddr = new_mac_da;
-	    hdr.ethernet.srcAddr = meta_mac_sa;
-
-	    // Update our ipv6 header addresses
-	    hdr.ipv6.dstAddr = new_ip_da;
-	    hdr.ipv6.srcAddr = meta_ip_sa;
-
-	    // Reset our hop limit
-	    hdr.ipv6.hopLimit = 255;  // Required by RFC4860 ICMPv6
-
-	    // Set our new payload length
-	    hdr.ipv6.payloadLen = 32;  // ICMPv6 + target IP + lladdr option
-
-	    // Fill out the ICMPv6 common header
-	    hdr.icmpv6_common.setValid();
-	    hdr.icmpv6_common.msg_type_code = 8w136 ++ 8w0;   // ND Advertisement
-	    hdr.icmpv6_common.checksum = 0;     // This will be fixed up below
-
-	    // Fill out our ND advertisement
-	    hdr.ipv6nd_neigh_adv.setValid();
-	    hdr.ipv6nd_neigh_adv.router_flag    = 0;
-	    hdr.ipv6nd_neigh_adv.solicited_flag = solicited;
-	    hdr.ipv6nd_neigh_adv.override_flag  = 0;
-	    hdr.ipv6nd_neigh_adv.rsvd           = 0;
-	    hdr.ipv6nd_neigh_adv.target         = hdr.ipv6nd_neigh_sol.target;
-
-	    // Fill out the ND advertisement option common header
-	    hdr.ipv6nd_adv_option_common.setValid();
-	    hdr.ipv6nd_adv_option_common.option_type   = 2;   // Target Link-Layer Address
-	    hdr.ipv6nd_adv_option_common.length        = 1;
-
-	    // Fill out the ND advertisement lladdr common header
-	    hdr.ipv6nd_adv_option_lladdr.setValid();
-	    hdr.ipv6nd_adv_option_lladdr.ethernet_addr = meta_mac_sa;
-
-	    // Calculate the checksum over the pseudo header + payload
-	    l4_cksum.clear();
-	    l4_cksum.add({
-		// IPv6 pseudo-header
-		hdr.ipv6.srcAddr,
-		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
-		24w0 ++ hdr.ipv6.nextHdr,
-		// ICMP common header fields
-		hdr.icmpv6_common,
-		// ICMP neighbour advertisement header
-		hdr.ipv6nd_neigh_adv,
-		// ICMP neighbour advertisement option common header fields
-		hdr.ipv6nd_adv_option_common,
-		// ICMP neighbour advertisement LLADDR header fields
-		hdr.ipv6nd_adv_option_lladdr
-	    });
-	    l4_cksum.get(hdr.icmpv6_common.checksum);
-
-	    rx_rslt_counter.count(rx_rslt_ok_ipv6nd_neigh_sol);
-	    return;
-	}
-
 	// Packets making it this far are destined for the load balancer offload path
-	rx_rslt_counter.count(rx_rslt_ok_lb);
-
-	lb_ctx_rx_pkt_counter.count(meta_lb_id);
-	lb_ctx_rx_byte_counter.count(meta_lb_id);
+	lb_rx_pkt_counter.count(ingress_lb_id);
+	lb_rx_byte_counter.count(ingress_lb_id);
 
 	//
 	// IP source filter
 	//   Only allow forwarding packets from explicitly allowed source IPs
 	//
 
-	if (hdr.ipv4.isValid()) {
-	    hit = ipv4_src_filter_table.apply().hit;
-	    if (!hit) {
-		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
-		return;
+	bool ip_src_hit = false;
+	if (hdr.ipv4.isValid() || hdr.ipv6.isValid()) {
+	    if (hdr.ipv4.isValid()) {
+		ip_src_hit = ipv4_src_filter_table.apply().hit;
+	    } else if (hdr.ipv6.isValid()) {
+		ip_src_hit = ipv6_src_filter_table.apply().hit;
 	    }
-	} else if (hdr.ipv6.isValid()) {
-	    hit = ipv6_src_filter_table.apply().hit;
-	    if (!hit) {
-		lb_ctx_drop_blocked_src_pkt_counter.count(meta_lb_id);
+	    if (!ip_src_hit) {
+		lb_drop_blocked_src_pkt_counter.count(ingress_lb_id);
+		drop_3();
 		return;
 	    }
 	} else {
 	    // Drop all non-IP packets
-	    lb_ctx_drop_not_ip_pkt_counter.count(meta_lb_id);
-	    drop();
+	    lb_drop_not_ip_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
 	}
 
@@ -825,21 +1057,29 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// Packets missing this header should have failed at the parser but this will double check
 	// before processing further.
 	if (!hdr.udplb_common.isValid()) {
-	    lb_ctx_drop_no_udplb_hdr_pkt_counter.count(meta_lb_id);
-	    drop();
+	    lb_drop_no_udplb_hdr_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
 	}
 
 	// Make sure we have a supported udplb version header
 	if (hdr.udplb_v2.isValid()) {
-	    lb_ctx_rx_v2_counter.count(meta_lb_id);
+	    lb_rx_v2_counter.count(ingress_lb_id);
 	} else if (hdr.udplb_v3.isValid()) {
-	    lb_ctx_rx_v3_counter.count(meta_lb_id);
+	    lb_rx_v3_counter.count(ingress_lb_id);
 	} else {
-	    lb_ctx_drop_bad_udplb_version_pkt_counter.count(meta_lb_id);
-	    drop();
+	    lb_drop_bad_udplb_version_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
 	}
+
+	// NOTE  NOTE  NOTE  NOTE
+	//
+	// All packets past this point are confirmed to be
+	//   (IPv4 or IPv6) and UDP and (UDPLBv2 or UDPLBv3)
+	// all remaining checks below will rely on this
+	//
+	// NOTE  NOTE  NOTE  NOTE
 
 	// Subtract the old IPv4 header from the l3 checksum (if present) before modifying it
 	// NOTE: This is to avoid having to keep track of the checksum over the IPv4 options
@@ -887,14 +1127,39 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    });
 	}
 
+
+#if INCLUDE_TTL_DECREMENT
+	if ((hdr.ipv4.isValid() && hdr.ipv4.ttl <= 1) ||
+	    (hdr.ipv6.isValid() && hdr.ipv6.hopLimit <= 1)) {
+	    // TTL has expired.  Drop the packet.
+	    lb_drop_ttl_expired_pkt_counter.count(ingress_lb_id);
+	    drop_3();
+	    return;
+	}
+
+	// TTL has not expired, decrement it
+	if (hdr.ipv4.isValid()) {
+	    // TTL has not expired, decrement it
+	    bit<8> ttl = hdr.ipv4.ttl;
+	    hdr.ipv4.ttl = ttl - 1;
+	} else if (hdr.ipv6.isValid()) {
+	    // TTL has not expired, decrement it
+	    bit<8> hopLimit = hdr.ipv6.hopLimit;
+	    hdr.ipv6.hopLimit = hopLimit - 1;
+	}
+#endif
+
 	// All packets must be originated with our assigned unicast MAC address
-	hdr.ethernet.srcAddr = meta_mac_sa;
+
+	// TODO: with VLAN support, this MAC should be the *egress* L2 interface's MAC maybe?? Or do we have exactly 1 ucast MAC
+	//       across all of the VLANs?
+	hdr.ethernet.srcAddr = ingress_l2_iface_uc_mac;
 
 	// All packets must be originated with our assigned unicast IP address
 	if (hdr.ipv4.isValid()) {
-	    hdr.ipv4.srcAddr = meta_ip_sa[31:0];
+	    hdr.ipv4.srcAddr = ingress_l3_iface_uc_ip[31:0];
 	} else if (hdr.ipv6.isValid()) {
-	    hdr.ipv6.srcAddr = meta_ip_sa;
+	    hdr.ipv6.srcAddr = ingress_l3_iface_uc_ip;
 	}
 
 	//
@@ -908,9 +1173,13 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    tick = hdr.udplb_v3.tick;
 	}
 
-	hit = epoch_assign_table.apply().hit;
-	if (!hit) {
-	    lb_ctx_drop_epoch_assign_miss_pkt_counter.count(meta_lb_id);
+	// Record the latest tick value provided by this sender
+	src_tick.write(meta_src_id, tick);
+
+	bool epoch_assign_hit = epoch_assign_table.apply().hit;
+	if (!epoch_assign_hit) {
+	    lb_drop_epoch_assign_miss_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
 	}
 
@@ -936,9 +1205,10 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// Pick the calendar slot for this packet
 	calendar_slot = (slot_select ^ meta_slot_select_xor) & slot_select_mask;
 
-	hit = load_balance_calendar_table.apply().hit;
-	if (!hit) {
-	    lb_ctx_drop_lb_calendar_miss_pkt_counter.count(meta_lb_id);
+	bool lb_calendar_hit = load_balance_calendar_table.apply().hit;
+	if (!lb_calendar_hit) {
+	    lb_drop_lb_calendar_miss_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
 	}
 
@@ -946,10 +1216,25 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	// MemberInfoLookup
 	//
 
-	hit = member_info_lookup_table.apply().hit;
-	if (!hit) {
-	    lb_ctx_drop_mbr_info_miss_pkt_counter.count(meta_lb_id);
+	bool member_info_hit = member_info_lookup_table.apply().hit;
+	if (!member_info_hit) {
+	    lb_drop_mbr_info_miss_pkt_counter.count(ingress_lb_id);
+	    drop_3();
 	    return;
+	}
+
+	if (member_drop_reason == 1) {
+	    // Found an entry, but packet was dropped due to soft-eviction
+	    mbr_drop_soft_evicted_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else if (member_drop_reason == 2) {
+	    // Found an entry, but packet was dropped due to deregistered
+	    mbr_drop_deregistered_counter.count((bit<10>)meta_member_id);
+	    drop_3();
+	    return;
+	} else {
+	    // Not dropped, continue processing, will be counted later
 	}
 
 	// Set the MAC DA to point to the next hop at L2
@@ -1054,14 +1339,83 @@ control MatchActionImpl(inout headers hdr, inout smartnic_metadata snmeta, inout
 	    }
 	}
 
-	lb_mbr_tx_pkt_counter.count((bit<13>)meta_member_id);
-	lb_mbr_tx_byte_counter.count((bit<13>)meta_member_id);
+	mbr_tx_pkt_counter.count((bit<10>)meta_member_id);
+	mbr_tx_byte_counter.count((bit<10>)meta_member_id);
+
+	ok = true;
+	tx_ready = true;
+    }
+}
+
+#endif // INCLUDE_EJFAT_PROC
+
+control MatchActionImpl(
+inout headers hdr,
+inout smartnic_metadata snmeta,
+inout standard_metadata_t smeta)
+{
+    action drop_0() {
+	smeta.drop = 1;
+    }
+
+    // Raw counter of all received packets
+    Counter<bit<64>, bit<1>>(1, CounterType_t.PACKETS_AND_BYTES) rx_counter;
+
+    // Raw counter or all received packets by physical port
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS_AND_BYTES) phys_counter;
+
+    // Raw counter or all received packets by physical port
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_parsefail_counter;
+
+    apply {
+
+	// Count all received packets and bytes
+	rx_counter.count(0);
+	// Count received packets and bytes by physical ingress port
+	phys_counter.count(snmeta.ingress_port);
+
+	if (smeta.parser_error != error.NoError) {
+	    phys_parsefail_counter.count(snmeta.ingress_port);
+	    drop_0();
+	    return;
+	}
+
+	// Set default egress physical port to the ingress physical port to ensure that we always
+	// have tx BW available any time we had rx BW available -- no re-hashing across the tx LAG
+	snmeta.egress_port = snmeta.ingress_port;
+
+	bool ok = false;
+	bool tx_ready = false;
+	bit<4> ingress_l2_iface_id;
+	bit<48> ingress_l2_iface_uc_mac;
+
+#if INCLUDE_L2_PROC
+	L2IfaceMap.apply(hdr, snmeta, smeta, ok, ingress_l2_iface_id, ingress_l2_iface_uc_mac, tx_ready);
+	if (!ok || tx_ready) return;
+#endif // INCLUDE_L2_PROC
+
+#if INCLUDE_L3_PROC
+	bit<128> ingress_l3_iface_uc_ip;
+	bit<8> ingress_lb_id;
+	L3IfaceMap.apply(hdr, snmeta, smeta, ingress_l2_iface_id, ingress_l2_iface_uc_mac, ok, ingress_l3_iface_uc_ip, ingress_lb_id, tx_ready);
+	if (!ok || tx_ready) return;
+#endif // INCLUDE_L3_PROC
+
+#if INCLUDE_EJFAT_PROC
+	EJFAT.apply(hdr, snmeta, smeta, ingress_l2_iface_uc_mac, ingress_l3_iface_uc_ip, ingress_lb_id, ok, tx_ready);
+	if (!ok || tx_ready) return;
+#endif // INCLUDE_EJFAT_PROC
+
+	// How did we get here?!?
+	smeta.drop = 1;
+	return;
     }
 }
 
 control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
+	packet.emit(hdr.vlan);
 	packet.emit(hdr.arp);
 
         packet.emit(hdr.ipv4);

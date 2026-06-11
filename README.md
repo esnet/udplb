@@ -19,7 +19,7 @@ cp protocols/ejfat-stack.lua ~/.local/lib/wireshark/plugins/
 # Set up the vivado tools environment
 
 ```
-source /tools/Xilinx/Vivado/2023.2/settings64.sh
+source /tools/Xilinx/2025.2/Vivado/settings64.sh
 ```
 
 # Use robot and the p4bm behavioural model to simulate the p4 pipeline

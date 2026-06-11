@@ -18,7 +18,7 @@ variables:
   SN_HW_APP_NAME: ejfat
 
 .common:
-  image: $CI_REGISTRY/ht/xilinx-tools-docker:77364-g0c199152
+  image: $CI_REGISTRY/ht/xilinx-tools-docker:100594-g31ff8c4d
   before_script:
     - if [ $RANDOMIZE_SEED -gt 0 ]; then export SEED=$RANDOM; fi
     - echo "Running pipeline with SEED $SEED..."
@@ -35,23 +35,21 @@ p4bm:
   tags:
     - ht-sim
   script:
-    - apt update -y
-    - apt install -y python3-setuptools
-
     # Override the version of scapy in the base image so we can use a newer version in CI
-    - apt remove -y --purge python3-scapy
-    - pip3 install scapy
+    - uv pip install --upgrade scapy
 
-    - pip3 install robotframework
+    - uv pip install robotframework
     - make -s -C p4 compile
     - |
       robot --variable P4_HW_ENV:p4bm-sim \
+            --pythonpath="${XILINX_VIVADO}/tps/lib/python3.13" \
             --pythonpath=esnet-smartnic-hw/test/library/p4_robot_p4bm \
             --pythonpath=esnet-smartnic-hw/test/library/p4_robot \
             --pythonpath=esnet-smartnic-hw/test/library/packet_robot \
             --pythonpath=robot-tests/library/lb_robot \
             --pythonpath=robot-tests/library/packet_lb_robot \
             -d robot-output/ \
+            --nostatusrc \
             robot-tests/p4-tests.robot
     - rebot --xunit robot-output/output.xunit.xml robot-output/output.xml
   artifacts:
@@ -71,8 +69,7 @@ sim_app_tests:
     - ht-sim
   script:
     # Override the version of scapy in the base image so we can use a newer version in CI
-    - apt remove -y --purge python3-scapy
-    - pip3 install scapy
+    - uv pip install --upgrade scapy
 
     - make -s config
     - make -s -C tests/regression
