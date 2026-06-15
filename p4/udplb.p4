@@ -16,6 +16,10 @@
 #define INCLUDE_ICMPV6_ND_PROC   1
 #define INCLUDE_EJFAT_PROC       1
 
+#define INCLUDE_IEEE802_GROUP_PROC 1
+#define INCLUDE_DOT3_SLOW_PROC   1
+#define INCLUDE_LLDP_PROC        1
+
 #define INCLUDE_TTL_DECREMENT    1
 
 struct smartnic_metadata {
@@ -38,6 +42,34 @@ header ethernet_t {
     bit<48> srcAddr;
     bit<16> etherType;
 }
+
+#if INCLUDE_LLDP_PROC
+
+// Ref: IEEE Std 802.1AB-2016 Section 7
+// Dest MAC: 01-80-C2-00-00-0E (Nearest Bridge)
+// Ethertype: 88-CC
+header lldp_t {
+    bit<7>  t;       // not used, but included to prevent errors in RTL code gen when a header is empty
+    bit<9>  length;  // not used, but included to prevent errors in RTL code gen when a header is empty
+}
+
+#endif // INCLUDE_LLDP_PROC
+
+#if INCLUDE_DOT3_SLOW_PROC
+
+// Ref: IEEE Std 802.3-2018 Annex 57A
+// Dest MAC: 01-80-C2-00-00-02 (IEEE 802.3 Slow_Protocols_Multicast group address)
+// Ethertype: 88-09
+#define IEEE_802_3_SLOW_SUBTYPE_LACP 1
+header dot3_slow_common_t {
+    bit<8>  subtype;
+}
+
+// Ref: IEEE Std 802.1AX-2020 section 6.4.2
+header lacp_t {
+    bit<8>  version;  // not used, but included to prevent errors in RTL code gen when a header is empty
+}
+#endif // INCLUDE_DOT3_SLOW_PROC
 
 header vlan_t {
     bit<3>  pcp;
@@ -167,6 +199,14 @@ header udplb_v3_t {
 
 struct headers {
     ethernet_t              ethernet;
+#if INCLUDE_LLDP_PROC
+    lldp_t                  lldp;
+#endif // INCLUDE_LLDP_PROC
+#if INCLUDE_DOT3_SLOW_PROC
+    dot3_slow_common_t      dot3_slow_common;
+    lacp_t                  lacp;
+#endif // INCLUDE_DOT3_SLOW_PROC
+
     vlan_t                  vlan;
     arp_t                   arp;
     ipv4_t                  ipv4;
@@ -212,8 +252,36 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	    16w0x0806: parse_arp;
             16w0x8100: parse_dot1q; // 802.1q C-tag
             16w0x86dd: parse_ipv6;
+#if INCLUDE_DOT3_SLOW_PROC
+	    16w0x8809: parse_dot3_slow_protos; // includes LACP
+#endif // INCLUDE_DOT3_SLOW_PROC
+#if INCLUDE_LLDP_PROC
+	    16w0x88cc: parse_lldp;
+#endif // INCLUDE_LLDP_PROC
         }
     }
+
+#if INCLUDE_DOT3_SLOW_PROC
+    state parse_dot3_slow_protos {
+	packet.extract(hdr.dot3_slow_common);
+	transition select(hdr.dot3_slow_common.subtype) {
+	    8w0x01: parse_lacp;
+	    default: accept;
+	}
+    }
+
+    state parse_lacp {
+	packet.extract(hdr.lacp);
+	transition accept;
+    }
+#endif // INCLUDE_DOT3_SLOW_PROC
+
+#if INCLUDE_LLDP_PROC
+    state parse_lldp {
+	packet.extract(hdr.lldp);
+	transition accept;
+    }
+#endif // INCLUDE_LLDP_PROC
 
     state parse_dot1q {
 	packet.extract(hdr.vlan);
@@ -1367,6 +1435,17 @@ inout standard_metadata_t smeta)
     // Raw counter or all received packets by physical port
     Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_parsefail_counter;
 
+#if INCLUDE_IEEE802_GROUP_PROC
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_ieee802_multicast_counter;
+#if INCLUDE_DOT3_SLOW_PROC
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_dot3_slow_lacp_counter;
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_dot3_slow_other_counter;
+#endif // INCLUDE_DOT3_SLOW_PROC
+#if INCLUDE_LLDP_PROC
+    Counter<bit<64>, bit<4>>(16, CounterType_t.PACKETS) phys_lldp_counter;
+#endif // INCLUDE_LLDP_PROC
+#endif // INCLUDE_IEEE802_GROUP_PROC
+
     apply {
 
 	// Count all received packets and bytes
@@ -1388,6 +1467,35 @@ inout standard_metadata_t smeta)
 	bool tx_ready = false;
 	bit<4> ingress_l2_iface_id;
 	bit<48> ingress_l2_iface_uc_mac;
+
+
+#if INCLUDE_IEEE802_GROUP_PROC
+	// Identify all IEEE 802 Reserved Multicast Addresses and direct them to the host PF
+	//   Ref: https://standards.ieee.org/products-programs/regauth/grpmac/public/
+	// These are typically link-local protocols that the local system may choose to participate in
+	// or at least monitor for activity.  These are always allowed on the untagged interface even in
+	// the absence of valid configuration in the L2 interface table.
+	if ((!hdr.vlan.isValid()) && (hdr.ethernet.dstAddr & 0xFFFFFFFFFFF0 == 0x0180C2000000)) {
+	    phys_ieee802_multicast_counter.count(snmeta.ingress_port);
+	    if (false) {
+#if INCLUDE_DOT3_SLOW_PROC
+	    } else if (hdr.dot3_slow_common.isValid()) {
+		if (hdr.lacp.isValid()) {
+		    phys_dot3_slow_lacp_counter.count(snmeta.ingress_port);
+		} else {
+		    phys_dot3_slow_other_counter.count(snmeta.ingress_port);
+		}
+#endif // INCLUDE_DOT3_SLOW_PROC
+#if INCLUDE_LLDP_PROC
+	    } else if (hdr.lldp.isValid()) {
+		phys_lldp_counter.count(snmeta.ingress_port);
+#endif // INCLUDE_LLDP_PROC
+	    }
+	    snmeta.egress_port = snmeta.ingress_port | (bit<4>)(1 << 1);  // Send the packet to the PCIe PF
+	    return;
+	}
+
+#endif // INCLUDE_IEEE802_GROUP_PROC
 
 #if INCLUDE_L2_PROC
 	L2IfaceMap.apply(hdr, snmeta, smeta, ok, ingress_l2_iface_id, ingress_l2_iface_uc_mac, tx_ready);
@@ -1415,6 +1523,13 @@ inout standard_metadata_t smeta)
 control DeparserImpl(packet_out packet, in headers hdr, inout smartnic_metadata snmeta, inout standard_metadata_t smeta) {
     apply {
         packet.emit(hdr.ethernet);
+#if INCLUDE_LLDP_PROC
+	packet.emit(hdr.lldp);
+#endif // INCLUDE_LLDP_PROC
+#if INCLUDE_DOT3_SLOW_PROC
+	packet.emit(hdr.dot3_slow_common);
+	packet.emit(hdr.lacp);
+#endif // INCLUDE_DOT3_SLOW_PROC
 	packet.emit(hdr.vlan);
 	packet.emit(hdr.arp);
 

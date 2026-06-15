@@ -23,6 +23,91 @@ ${LB_UDP_DST_PORT_MAX}  ${32767}
 
 *** Test Cases ***
 
+LB0 LLDP Receive Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=01:80:C2:00:00:0E   # Nearest bridge
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP ChassisID  id=mychassisid
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP PortID  id=myportid
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP TimeToLive  ttl=${20}
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP SystemName  system_name=mysystemname
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP SystemDescription  description=mysystemdescription
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP EndOfLLDPPDU
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_ieee802_multicast_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_lldp_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  1
+
+    # TODO: Once p4 pipeline metadata is available in robot, this test should confirm that the packet
+    #       is being forwarded to the host PCIe PF rather than back out the network interfaces.
+
+    ${pkt}  Set Variable  ${packets_out[0]}
+    Packet Field Equal  ${pkt}  Ethernet  dst  01:80:c2:00:00:0e
+    Packet Layer Is Present  ${pkt}  LLDPDU
+    Packet Field Equal  ${pkt}  LLDPDUChassisID  id  ${{bytes("mychassisid","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUPortID  id  ${{bytes("myportid","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUTimeToLive  ttl  ${20}
+    Packet Field Equal  ${pkt}  LLDPDUSystemName  system_name  ${{bytes("mysystemname","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUSystemDescription  description  ${{bytes("mysystemdescription","utf-8")}}
+    Packet Layer Is Present  ${pkt}  LLDPDUEndOfLLDPDU
+
+LB0 LACP Receive Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=01:80:C2:00:00:02   # IEEE 802.3 Slow Protocols Multicast
+    ${pkt}  Packet Extend  ${pkt}  Packet SlowProtocol
+    ${pkt}  Packet Extend  ${pkt}  Packet LACP
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_ieee802_multicast_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_dot3_slow_lacp_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  1
+
+    # TODO: Once p4 pipeline metadata is available in robot, this test should confirm that the packet
+    #       is being forwarded to the host PCIe PF rather than back out the network interfaces.
+
+    ${pkt}  Set Variable  ${packets_out[0]}
+    Packet Field Equal  ${pkt}  Ethernet  dst  01:80:c2:00:00:02
+    Packet Layer Is Present  ${pkt}  LACP
+
 LB0 ICMPv4 Echo Request Test
     [Documentation]
     ${packets_in}  Create List
