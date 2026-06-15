@@ -1098,7 +1098,7 @@ out bool tx_ready)
 		// IPv4 pseudo-header
 		hdr.ipv4.srcAddr,
 		hdr.ipv4.dstAddr,
-		hdr.ipv4.totalLen,
+		hdr.udp.totalLen,
 		8w0 ++ hdr.ipv4.protocol
 	    });
 	} else if (hdr.ipv6.isValid()) {
@@ -1106,7 +1106,7 @@ out bool tx_ready)
 		// IPv6 pseudo-header
 		hdr.ipv6.srcAddr,
 		hdr.ipv6.dstAddr,
-		16w0 ++ hdr.ipv6.payloadLen,
+		16w0 ++ hdr.udp.totalLen,
 		24w0 ++ hdr.ipv6.nextHdr
 	    });
 	}
@@ -1302,14 +1302,14 @@ out bool tx_ready)
 		l4_cksum.add({
 		    hdr.ipv4.srcAddr,
 		    hdr.ipv4.dstAddr,
-		    hdr.ipv4.totalLen,
+		    hdr.udp.totalLen,
 		    8w0 ++ hdr.ipv4.protocol
 		});
 	    } else if (hdr.ipv6.isValid()) {
 		l4_cksum.add({
 		    hdr.ipv6.srcAddr,
 		    hdr.ipv6.dstAddr,
-		    16w0 ++ hdr.ipv6.payloadLen,
+		    16w0 ++ hdr.udp.totalLen,
 		    24w0 ++ hdr.ipv6.nextHdr
 		});
 	    }
