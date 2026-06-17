@@ -23,6 +23,91 @@ ${LB_UDP_DST_PORT_MAX}  ${32767}
 
 *** Test Cases ***
 
+LB0 LLDP Receive Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=01:80:C2:00:00:0E   # Nearest bridge
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP ChassisID  id=mychassisid
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP PortID  id=myportid
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP TimeToLive  ttl=${20}
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP SystemName  system_name=mysystemname
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP SystemDescription  description=mysystemdescription
+    ${pkt}  Packet Extend  ${pkt}  Packet LLDP EndOfLLDPPDU
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_ieee802_multicast_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_lldp_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  1
+
+    # TODO: Once p4 pipeline metadata is available in robot, this test should confirm that the packet
+    #       is being forwarded to the host PCIe PF rather than back out the network interfaces.
+
+    ${pkt}  Set Variable  ${packets_out[0]}
+    Packet Field Equal  ${pkt}  Ethernet  dst  01:80:c2:00:00:0e
+    Packet Layer Is Present  ${pkt}  LLDPDU
+    Packet Field Equal  ${pkt}  LLDPDUChassisID  id  ${{bytes("mychassisid","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUPortID  id  ${{bytes("myportid","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUTimeToLive  ttl  ${20}
+    Packet Field Equal  ${pkt}  LLDPDUSystemName  system_name  ${{bytes("mysystemname","utf-8")}}
+    Packet Field Equal  ${pkt}  LLDPDUSystemDescription  description  ${{bytes("mysystemdescription","utf-8")}}
+    Packet Layer Is Present  ${pkt}  LLDPDUEndOfLLDPDU
+
+LB0 LACP Receive Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=01:80:C2:00:00:02   # IEEE 802.3 Slow Protocols Multicast
+    ${pkt}  Packet Extend  ${pkt}  Packet SlowProtocol
+    ${pkt}  Packet Extend  ${pkt}  Packet LACP
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_ieee802_multicast_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_dot3_slow_lacp_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  1
+
+    # TODO: Once p4 pipeline metadata is available in robot, this test should confirm that the packet
+    #       is being forwarded to the host PCIe PF rather than back out the network interfaces.
+
+    ${pkt}  Set Variable  ${packets_out[0]}
+    Packet Field Equal  ${pkt}  Ethernet  dst  01:80:c2:00:00:02
+    Packet Layer Is Present  ${pkt}  LACP
+
 LB0 ICMPv4 Echo Request Test
     [Documentation]
     ${packets_in}  Create List
@@ -444,6 +529,7 @@ Low Invalid UDP Port UDPLBv2 IPv4 Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -468,6 +554,8 @@ Low Invalid UDP Port UDPLBv2 IPv4 Drop Test
     # EJFAT Rx Counters
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
+
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -488,6 +576,7 @@ High Invalid UDP Port UDPLBv2 IPv4 Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -513,6 +602,8 @@ High Invalid UDP Port UDPLBv2 IPv4 Drop Test
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_no_udplb_hdr_pkt_counter  0
 
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
 
@@ -532,6 +623,7 @@ Invalid UDPLB version IPv4 Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -539,6 +631,8 @@ Invalid UDPLB version IPv4 Drop Test
     P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.phys_parsefail_counter  0
+
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -567,6 +661,9 @@ IPv4 TTL Expired Drop Test
 
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
+    P4 Counter Reset All
+    P4 Register Reset All
+
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
@@ -599,6 +696,8 @@ IPv4 TTL Expired Drop Test
     P4 Counter Packets Equal  2  MatchActionImpl.EJFAT.lb_drop_ttl_expired_pkt_counter  0
 
     P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -627,6 +726,9 @@ IPv6 TTL Expired Drop Test
 
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
+    P4 Counter Reset All
+    P4 Register Reset All
+
     P4 Run Traffic  ${test_dir}/packets
 
     # Physical Rx Counters
@@ -660,6 +762,8 @@ IPv6 TTL Expired Drop Test
 
     P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
 
@@ -679,6 +783,7 @@ LB0 Default UDP Port UDPLBv2 IPv4 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -710,6 +815,8 @@ LB0 Default UDP Port UDPLBv2 IPv4 Test
     P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  10  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -739,6 +846,7 @@ LB0 Min UDP Port UDPLBv2 IPv4 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -770,6 +878,8 @@ LB0 Min UDP Port UDPLBv2 IPv4 Test
     P4 Counter Packets Equal  0  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  10  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -926,6 +1036,7 @@ LB0 Random UDP Ports UDPLBv3 IPv6 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -957,6 +1068,8 @@ LB0 Random UDP Ports UDPLBv3 IPv6 Test
     P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
     P4 Counter Packets Equal  ${num_random}  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  3  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -992,6 +1105,7 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1023,6 +1137,8 @@ LB1 Random UDP Port UDPLBv3 IPv6 Test
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  1
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  16  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -1064,6 +1180,7 @@ LB0 Checksum Sweep UDPLBv2 IPv4 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1096,6 +1213,8 @@ LB0 Checksum Sweep UDPLBv2 IPv4 Test
 
     P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
 
+    P4 Register Equal  10  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     #Packet Log Packets  ${packets_out}
 
@@ -1125,6 +1244,7 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1156,6 +1276,8 @@ LB0 Checksum Sweep UDPLBv3 IPv6 Test
     P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
     P4 Counter Packets Equal  65536  MatchActionImpl.EJFAT.mbr_tx_pkt_counter  0
+
+    P4 Register Equal  3  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     #Packet Log Packets  ${packets_out}
@@ -1223,6 +1345,7 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv6 Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1247,6 +1370,8 @@ LB0 UDPLBv3 Sent from Allowed Src for LB1 IPv6 Drop Test
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_pkt_counter  0
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_blocked_src_pkt_counter  0
 
+    P4 Register Equal  0  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
 
@@ -1266,6 +1391,7 @@ LB0 UDPLBv3 Epoch Assign Miss Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1293,6 +1419,8 @@ LB0 UDPLBv3 Epoch Assign Miss Drop Test
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_epoch_assign_miss_pkt_counter  0
 
+    P4 Register Equal  9999999  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
 
@@ -1312,6 +1440,7 @@ LB0 UDPLBv3 LB Calendar Miss Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     P4 Run Traffic  ${test_dir}/packets
 
@@ -1339,6 +1468,8 @@ LB0 UDPLBv3 LB Calendar Miss Drop Test
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_lb_calendar_miss_pkt_counter  0
 
+    P4 Register Equal  16  MatchActionImpl.EJFAT.src_tick  0
+
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
 
@@ -1358,6 +1489,7 @@ LB0 UDPLBv3 Member Info Miss Drop Test
     Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
 
     P4 Counter Reset All
+    P4 Register Reset All
 
     # Create a calendar slot (2) pointing at a nonexistent member info (1)
     # LB0 Epoch 1 (ticks 16-31) has slot_select_bit_cnt = 3 and slot_select_xor = 0xffff
@@ -1392,6 +1524,8 @@ LB0 UDPLBv3 Member Info Miss Drop Test
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_rx_v3_counter  0
 
     P4 Counter Packets Equal  1  MatchActionImpl.EJFAT.lb_drop_mbr_info_miss_pkt_counter  0
+
+    P4 Register Equal  16  MatchActionImpl.EJFAT.src_tick  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
