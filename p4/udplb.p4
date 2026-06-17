@@ -22,6 +22,9 @@
 
 #define INCLUDE_TTL_DECREMENT    1
 
+#define INCLUDE_ICMPV4_DEST_UNREACH_PROC 1
+#define INCLUDE_ICMPV6_DEST_UNREACH_PROC 1
+
 struct smartnic_metadata {
     bit<64> timestamp_ns;    // 64b timestamp (in nanoseconds). Set at packet arrival time.
     bit<16> pid;             // 16b packet id used by platform (READ ONLY - DO NOT EDIT).
@@ -208,11 +211,14 @@ struct headers {
 #endif // INCLUDE_DOT3_SLOW_PROC
 
     vlan_t                  vlan;
+
     arp_t                   arp;
+
     ipv4_t                  ipv4;
     ipv4_opt_t              ipv4_opt;
     icmpv4_common_t         icmpv4_common;
     icmpv4_echo_t           icmpv4_echo;
+
     ipv6_t                  ipv6;
     icmpv6_common_t         icmpv6_common;
     icmpv6_echo_t           icmpv6_echo;
@@ -223,7 +229,13 @@ struct headers {
     ipv6nd_neigh_adv_t      ipv6nd_neigh_adv;
     ipv6nd_adv_option_common_t  ipv6nd_adv_option_common;
     ipv6nd_adv_option_lladdr_t  ipv6nd_adv_option_lladdr;
+
+    ipv4_t                  icmp_embedded_ipv4;
+    ipv6_t                  icmp_embedded_ipv6;
+    udp_t                   icmp_embedded_udp;
+
     udp_t                   udp;
+
     udplb_common_t          udplb_common;
     udplb_v2_t              udplb_v2;
     udplb_v3_t              udplb_v3;
@@ -324,10 +336,31 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_icmpv6 {
 	packet.extract(hdr.icmpv6_common);
 	transition select(hdr.icmpv6_common.msg_type_code) {
+#if INCLUDE_ICMPV6_DEST_UNREACH_PROC
+	    8w1   ++ 8w0 &&& 16w0xFF00: parse_icmpv6_dest_unreach;
+#endif // INCLUDE_ICMPV6_DEST_UNREACH_PROC
 	    8w128 ++ 8w0: parse_icmpv6_echo;
 	    8w135 ++ 8w0: parse_ipv6nd_neigh_sol;
 	}
     }
+
+#if INCLUDE_ICMPV6_DEST_UNREACH_PROC
+    state parse_icmpv6_dest_unreach {
+	packet.extract(hdr.icmp_embedded_ipv6);
+	transition select(hdr.icmp_embedded_ipv6.nextHdr) {
+	    8w17: parse_icmp_embedded_udp;
+	    default: accept;
+	}
+    }
+
+#endif // INCLUDE_ICMPV6_DEST_UNREACH_PROC
+
+#if INCLUDE_ICMPV4_DEST_UNREACH_PROC || INCLUDE_ICMPV6_DEST_UNREACH_PROC
+    state parse_icmp_embedded_udp {
+	packet.extract(hdr.icmp_embedded_udp);
+	transition accept;
+    }
+#endif // INCLUDE_ICMPV4_DEST_UNREACH_PROC || INCLUDE_ICMPV6_DEST_UNREACH_PROC
 
     state parse_icmpv6_echo {
 	packet.extract(hdr.icmpv6_echo);
@@ -358,6 +391,9 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
     state parse_icmpv4 {
 	packet.extract(hdr.icmpv4_common);
 	transition select(hdr.icmpv4_common.msg_type_code) {
+#if INCLUDE_ICMPV4_DEST_UNREACH_PROC
+	    8w3 ++ 8w0 &&& 16w0xFF00: parse_icmpv4_dest_unreach;
+#endif // INCLUDE_ICMPV4_DEST_UNREACH_PROC
 	    8w8 ++ 8w0: parse_icmpv4_echo;
 	    default: accept;	// Will be rejected during packet processing
 	}
@@ -367,6 +403,16 @@ parser ParserImpl(packet_in packet, out headers hdr, inout smartnic_metadata snm
 	packet.extract(hdr.icmpv4_echo);
 	transition accept;
     }
+
+#if INCLUDE_ICMPV4_DEST_UNREACH_PROC
+    state parse_icmpv4_dest_unreach {
+	packet.extract(hdr.icmp_embedded_ipv4);
+	transition select(hdr.icmp_embedded_ipv4.protocol) {
+	    8w17: parse_icmp_embedded_udp;
+	    default: accept;
+	}
+    }
+#endif // INCLUDE_ICMPV4_DEST_UNREACH_PROC
 
     state parse_udp {
         packet.extract(hdr.udp);
@@ -600,12 +646,31 @@ out bool tx_ready)
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_unhandled;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_ok;
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_echo_dst_nomatch;
+
+#if INCLUDE_ICMPV4_DEST_UNREACH_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_net; // Code 0
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_host; // Code 1
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_port; // Code 3
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_frag_needed; // Code 4
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_net_unknown; // Code 6
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_host_unknown; // Code 7
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_host_prohibited; // Code 10
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv4_dest_unreach_other;
+#endif // INCLUDE_ICMPV4_DEST_UNREACH_PROC
 #endif // INCLUDE_ICMPV4_PROC
 
 #if INCLUDE_ICMPV6_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_unhandled;
 
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_echo_ok;
+
+#if INCLUDE_ICMPV6_DEST_UNREACH_PROC
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_dest_unreach_net;  // Code 0
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_dest_unreach_host_prohibited; // Code 1
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_dest_unreach_host; // Code 2
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_dest_unreach_port; // Code 4
+    Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_icmpv6_dest_unreach_other;
+#endif // INCLUDE_ICMPV6_DEST_UNREACH_PROC
 
 #if INCLUDE_ICMPV6_ND_PROC
     Counter<bit<64>, bit<8>>(16, CounterType_t.PACKETS) l3_ipv6nd_neigh_sol_ok;
@@ -737,6 +802,28 @@ out bool tx_ready)
 		    rx_done();
 		    return;
 		}
+#if INCLUDE_ICMPV4_DEST_UNREACH_PROC
+	    } else if (hdr.icmp_embedded_ipv4.isValid()) {
+		if (hdr.icmpv4_common.msg_type_code & 0x00FF == 0) {
+		    l3_icmpv4_dest_unreach_net.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 1) {
+		    l3_icmpv4_dest_unreach_host.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 3) {
+		    l3_icmpv4_dest_unreach_port.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 4) {
+		    l3_icmpv4_dest_unreach_frag_needed.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 6) {
+		    l3_icmpv4_dest_unreach_net_unknown.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 7) {
+		    l3_icmpv4_dest_unreach_host_unknown.count(ingress_lb_id);
+		} else if (hdr.icmpv4_common.msg_type_code & 0x00FF == 10) {
+		    l3_icmpv4_dest_unreach_host_prohibited.count(ingress_lb_id);
+		} else {
+		    l3_icmpv4_dest_unreach_other.count(ingress_lb_id);
+		}
+		drop_2();
+		return;
+#endif // INCLUDE_ICMPV4_DEST_UNREACH_PROC
 	    } else {
 		// Unhandled ICMPv4 packet type
 		l3_icmpv4_unhandled.count(ingress_lb_id);
@@ -886,6 +973,22 @@ out bool tx_ready)
 		    return;
 		}
 #endif // INCLUDE_ICMPV6_ND_PROC
+#if INCLUDE_ICMPV6_DEST_UNREACH_PROC
+	    } else if (hdr.icmp_embedded_ipv6.isValid()) {
+		if (hdr.icmpv6_common.msg_type_code & 0x00FF == 0) {
+		    l3_icmpv6_dest_unreach_net.count(ingress_lb_id);
+		} else if (hdr.icmpv6_common.msg_type_code & 0x00FF == 1) {
+		    l3_icmpv6_dest_unreach_host_prohibited.count(ingress_lb_id);
+		} else if (hdr.icmpv6_common.msg_type_code & 0x00FF == 2) {
+		    l3_icmpv6_dest_unreach_host.count(ingress_lb_id);
+		} else if (hdr.icmpv6_common.msg_type_code & 0x00FF == 4) {
+		    l3_icmpv6_dest_unreach_port.count(ingress_lb_id);
+		} else {
+		    l3_icmpv6_dest_unreach_other.count(ingress_lb_id);
+		}
+		drop_2();
+		return;
+#endif // INCLUDE_ICMPV6_DEST_UNREACH_PROC
 	    } else {
 		// Unhandled ICMPv6 packet type
 		l3_icmpv6_unhandled.count(ingress_lb_id);

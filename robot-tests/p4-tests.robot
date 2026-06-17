@@ -157,13 +157,13 @@ LB0 ICMPv4 Echo Request Test
     Packet Field Equal  ${pkt}  Raw  load  ${{b'payload goes here'}}
     Packet Checksums Ok  ${pkt}
 
-LB0 ICMPv4 Port Unreachable (Unhandled) Test
+LB0 ICMPv4 Port Unreachable (Counted) Test
     [Documentation]
     ${packets_in}  Create List
 
     ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
     ${pkt}  Packet Extend  ${pkt}  Packet IP  src=192.168.2.1  dst=${LB0_UCAST_IPV4}
-    ${pkt}  Packet Extend  ${pkt}  Packet ICMP  type=${3}  code=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet ICMP  type=${3}  code=${3}
     ${pkt}  Packet Extend  ${pkt}  Packet IP  src=${LB0_UCAST_IPV4}  dst=192.168.2.99
     ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${9999}  dport=${1234}
     ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=payload goes here
@@ -194,7 +194,8 @@ LB0 ICMPv4 Port Unreachable (Unhandled) Test
     P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
 
     # L3 Protocol Handler Counters
-    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv4_unhandled  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv4_dest_unreach_port  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l3_icmpv4_unhandled  0
 
     ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
     Packet Log Packets  ${packets_out}
@@ -247,6 +248,51 @@ LB0 ICMPv6Echo Request Test
     Packet Field Equal  ${pkt}  IPv6  src  ${LB0_UCAST_IPV6}
     Packet Field Equal  ${pkt}  ICMPv6EchoReply  data  ${{b'abcdef'}}
     Packet Checksums Ok  ${pkt}
+
+LB0 ICMPv6 Port Unreachable (Counted) Test
+    [Documentation]
+    ${packets_in}  Create List
+
+    ${pkt}  Packet Ether  dst=${LB_UCAST_MAC}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=fe80::1  dst=${LB0_UCAST_IPV6}
+    ${pkt}  Packet Extend  ${pkt}  Packet ICMPv6DestUnreach  code=${1}
+    ${pkt}  Packet Extend  ${pkt}  Packet IPv6  src=${LB0_UCAST_IPV6}  dst=fe80::2
+    ${pkt}  Packet Extend  ${pkt}  Packet UDP  sport=${9999}  dport=${1234}
+    ${pkt}  Packet Extend  ${pkt}  Packet Payload  payload=payload goes here
+
+    Append To List  ${packets_in}  ${pkt}
+
+    Packet Write Pcap  ${test_dir}/packets_in.pcap  ${packets_in}
+
+    P4 Counter Reset All
+
+    P4 Run Traffic  ${test_dir}/packets
+
+    # Physical Rx Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.rx_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.phys_counter  0
+
+    # L2 Interface Rx Counters
+    #P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_iface_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_iface_allow_counter  0
+
+    # L2 MAC DA Validation Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L2IfaceMap.l2_dst_drop_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L2IfaceMap.l2_dst_allow_counter  0
+
+    # L3 Rx Counters
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_notip_counter  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l2_iface_drop_badip_counter  0
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_allow_counter  0
+
+    # L3 Protocol Handler Counters
+    P4 Counter Packets Equal  1  MatchActionImpl.L3IfaceMap.l3_icmpv6_dest_unreach_host_prohibited  0
+    P4 Counter Packets Equal  0  MatchActionImpl.L3IfaceMap.l3_icmpv6_unhandled  0
+
+    ${packets_out}  Packet Read Pcap  ${test_dir}/packets_out.pcap
+    Packet Log Packets  ${packets_out}
+
+    Length Should Be  ${packets_out}  0
 
 LB0 ARP Test
     [Documentation]
