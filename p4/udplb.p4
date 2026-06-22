@@ -1143,16 +1143,10 @@ out bool tx_ready)
 	member_drop_reason = 2;
     }
 
-    // Deprecated action for backward compatibility only
-    // Use more specific "drop_soft_evicted" or "drop_deregistered" action
-    action drop() {
-    }
-
     table member_info_lookup_table {
 	actions = {
 	    do_ipv4_member_rewrite;
 	    do_ipv6_member_rewrite;
-	    drop;
 	    drop_soft_evicted;
 	    drop_deregistered;
 	}
